@@ -3,6 +3,7 @@ package services
 
 import (
 	"fmt"
+	"home-v4/backend/services/auth"
 	"home-v4/backend/services/db"
 )
 
@@ -11,6 +12,11 @@ func Setup() error {
 	if err := db.Setup(); err != nil {
 		return fmt.Errorf("Database setup failed with error: %w", err)
 	}
+
+	if err := auth.Setup(); err != nil {
+		return fmt.Errorf("Auth setup failed with error: %w", err)
+	}
+
 	return nil
 }
 

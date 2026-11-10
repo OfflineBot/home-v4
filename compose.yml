@@ -3,6 +3,7 @@ services:
     build:
       context: ./backend
       target: dev
+    env_file: .env
     environment:
       PORT: 8080
       DB_PATH: /data/home.db
@@ -18,6 +19,7 @@ services:
       target: dev
     environment:
       API_URL: http://backend:8080
+      SESSION_COOKIE_SECURE: "false"
     volumes:
       - ./frontend:/app
       - /app/node_modules

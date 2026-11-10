@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { Sidebar } from "./components/sidebar";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -42,7 +43,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-    return <Outlet />;
+    return (
+        <div className="flex min-h-screen">
+            <Sidebar />
+            <div className="min-w-0 flex-1">
+                <Outlet />
+            </div>
+        </div>
+    );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -62,7 +70,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     }
 
     return (
-        <main className="container mx-auto p-4 pt-16">
+        <main className="w-full p-8">
         <h1 className="text-2xl font-semibold text-ctp-red">{message}</h1>
         <p className="mt-2 text-ctp-subtext0">{details}</p>
         {stack && (

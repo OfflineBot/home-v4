@@ -3,6 +3,7 @@ services:
     build:
       context: ./backend
       target: prod
+    env_file: .env
     environment:
       PORT: 8080
       DB_PATH: /data/home.db
@@ -24,6 +25,7 @@ services:
     environment:
       PORT: 3000
       API_URL: http://backend:8080
+      SESSION_COOKIE_SECURE: "true"
     ports:
       - "3000:3000"
     depends_on:

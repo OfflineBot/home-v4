@@ -19,7 +19,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { online } = loaderData;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16">
+    <main className="w-full p-8">
       <h1 className="text-3xl font-semibold text-ctp-mauve">Home V4</h1>
 
       <p className="mt-6 flex items-center gap-2 text-ctp-subtext0">

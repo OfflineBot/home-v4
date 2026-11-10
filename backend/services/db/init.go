@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	_ "modernc.org/sqlite"
 )
@@ -14,6 +16,7 @@ const pragmas = "_pragma=foreign_keys(ON)" +
 	"&_pragma=journal_mode(WAL)" +
 	"&_pragma=busy_timeout(5000)"
 
+//go:embed *.sql
 var schemaFS embed.FS
 var DB *sql.DB
 
@@ -32,11 +35,17 @@ func Setup() error {
 	if err := conn.Ping(); err != nil { return err }
 	conn.SetMaxOpenConns(1)
 
-	schema, err := schemaFS.ReadFile("schema.sql")
+	names, err := fs.Glob(schemaFS, "*.sql")
 	if err != nil { return err }
-	
-	if _, err := conn.Exec(string(schema)); err != nil {
-		return err
+	slices.Sort(names)
+
+	for _, name := range names {
+		schema, err := schemaFS.ReadFile(name)
+		if err != nil { return err }
+
+		if _, err := conn.Exec(string(schema)); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
 	}
 
 	DB = conn
