@@ -1,41 +1,80 @@
-import { useState } from "react";
-import { Link, NavLink } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router";
+import { Icon } from "./icons";
 import { accent, navItems, settingsItem } from "../lib/nav";
+import { cookieName } from "../lib/sidebar";
 
 const row =
-  "flex h-10 items-center gap-3 overflow-hidden rounded-md px-2 text-sm";
-const slot = "grid size-6 shrink-0 place-items-center";
+  "flex items-center justify-start overflow-hidden rounded-md px-2 outline-none focus-visible:ring-2 focus-visible:ring-ctp-overlay0";
+const slot = "grid size-5 shrink-0 place-items-center";
 
-export function Sidebar() {
-  const [open, setOpen] = useState(true);
+type SidebarProps = {
+  defaultOpen?: boolean;
+};
+
+export function Sidebar({ defaultOpen = true }: SidebarProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const [menuOpen, setMenuOpen] = useState(false);
+  const account = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
 
-  const label = `truncate transition-opacity duration-200 ${
-    open ? "opacity-100" : "opacity-0"
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function onPointerDown(event: PointerEvent) {
+      if (!account.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    document.cookie = `${cookieName}=${
+      next ? "open" : "closed"
+    }; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  const label = `truncate text-sm transition-[opacity,width,margin] duration-200 ease-out ${
+    open ? "ml-3 opacity-100" : "ml-0 w-0 opacity-0"
   }`;
 
   return (
     <aside
-      className={`flex shrink-0 flex-col border-r border-ctp-surface0 bg-ctp-mantle p-2 transition-[width] duration-200 ease-out ${
-        open ? "w-56" : "w-14"
+      className={`flex shrink-0 flex-col transition-[width,padding] duration-200 ease-out ${
+        open ? "w-56 px-2" : "w-11 px-1"
       }`}
     >
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         aria-expanded={open}
+        aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
         title="home-v4"
-        className={`${row} text-left hover:bg-ctp-surface0`}
+        className={`${row} h-12 cursor-pointer text-ctp-subtext0 hover:bg-ctp-surface0 hover:text-ctp-text`}
       >
         <span className={slot}>
-          <span className="size-2.5 rounded-sm bg-ctp-mauve" />
+          <Icon name="menu" />
         </span>
-        <span className={`${label} font-semibold text-ctp-mauve`}>
-          home-v4
-        </span>
+        <span className={`${label} font-semibold text-ctp-mauve`}>home-v4</span>
       </button>
 
-      <nav className="mt-3 flex flex-col gap-1">
+      <nav className="mt-2 flex flex-col gap-0.5">
         {navItems.map((item) => (
           <NavLink
             key={item.slug}
@@ -43,44 +82,50 @@ export function Sidebar() {
             title={item.label}
             style={accent(item)}
             className={({ isActive }) =>
-              `${row} hover:bg-ctp-surface0 ${
+              `${row} h-9 hover:bg-ctp-surface0 ${
                 isActive
-                  ? "bg-ctp-surface0 text-[var(--accent)]"
-                  : "text-ctp-subtext0"
+                  ? "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)] text-[var(--accent)]"
+                  : "text-ctp-subtext0 hover:text-ctp-text"
               }`
             }
           >
-            <span className={slot}>
-              <span className="size-2.5 rounded-full bg-[var(--accent)]" />
+            <span className={`${slot} text-[var(--accent)]`}>
+              <Icon name={item.slug} />
             </span>
             <span className={label}>{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="relative mt-auto">
+      <div
+        ref={account}
+        className="relative mt-auto border-t border-ctp-surface0 pt-2"
+      >
         {menuOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-44 rounded-md border border-ctp-surface1 bg-ctp-surface0 p-1">
+          <div
+            role="menu"
+            className="absolute bottom-full left-0 mb-2 w-48 rounded-lg border border-ctp-surface0 bg-ctp-base p-1"
+          >
             <Link
               to={`/${settingsItem.slug}`}
-              onClick={() => setMenuOpen(false)}
+              role="menuitem"
               style={accent(settingsItem)}
-              className={`${row} text-ctp-subtext0 hover:bg-ctp-surface1 hover:text-[var(--accent)]`}
+              className={`${row} gap-3 h-9 text-sm text-ctp-subtext0 hover:bg-ctp-surface0 hover:text-ctp-text`}
             >
-              <span className={slot}>
-                <span className="size-2.5 rounded-full bg-[var(--accent)]" />
+              <span className={`${slot} text-[var(--accent)]`}>
+                <Icon name={settingsItem.slug} />
               </span>
-              <span className="truncate">{settingsItem.label}</span>
+              {settingsItem.label}
             </Link>
             <Link
               to="/login"
-              onClick={() => setMenuOpen(false)}
-              className={`${row} text-ctp-subtext0 hover:bg-ctp-surface1 hover:text-ctp-red`}
+              role="menuitem"
+              className={`${row} gap-3 h-9 text-sm text-ctp-subtext0 hover:bg-ctp-surface0 hover:text-ctp-text`}
             >
-              <span className={slot}>
-                <span className="size-2.5 rounded-full bg-ctp-red" />
+              <span className={`${slot} text-ctp-red`}>
+                <Icon name="logout" />
               </span>
-              <span className="truncate">Logout</span>
+              Logout
             </Link>
           </div>
         )}
@@ -91,23 +136,14 @@ export function Sidebar() {
           aria-expanded={menuOpen}
           aria-haspopup="menu"
           title="Account"
-          className={`group ${row} w-full hover:bg-ctp-surface0`}
+          className={`group ${row} h-9 w-full cursor-pointer text-ctp-subtext0 hover:bg-ctp-surface0 hover:text-ctp-text`}
         >
           <span className={slot}>
-            <span className="grid size-6 place-items-center rounded-full border border-ctp-surface1 text-ctp-overlay0 transition-colors group-hover:border-ctp-overlay0 group-hover:text-ctp-text">
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-                className="size-3.5"
-              >
-                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4 0-7 2-7 4.5V20h14v-1.5c0-2.5-3-4.5-7-4.5Z" />
-              </svg>
+            <span className="grid size-5 shrink-0 place-items-center rounded-full border border-ctp-surface1 transition-colors group-hover:border-ctp-overlay0">
+              <Icon name="user" className="size-3" />
             </span>
           </span>
-          <span className={`${label} text-ctp-subtext0 group-hover:text-ctp-text`}>
-            Account
-          </span>
+          <span className={label}>Account</span>
         </button>
       </div>
     </aside>

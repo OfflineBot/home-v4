@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -22,6 +23,7 @@ const tokenBytes = 32
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrNameTaken          = errors.New("name already taken")
+	ErrUnknownUser        = errors.New("unknown user")
 )
 
 type User = store.User
@@ -58,6 +60,10 @@ func Setup() error {
 		return err
 	}
 
+	if err := setupTwoFactor(); err != nil {
+		return err
+	}
+
 	if err := store.DeleteExpiredSessions(db.DB); err != nil {
 		return err
 	}
@@ -65,15 +71,35 @@ func Setup() error {
 	return ensureAdmin()
 }
 
-func Login(name, password string) (string, time.Time, error) {
+func Login(name, password, code string) (string, time.Time, error) {
 	user, err := store.UserByName(db.DB, strings.TrimSpace(name))
 	if err != nil {
 		bcrypt.CompareHashAndPassword(decoyHash, []byte(password))
 		return "", time.Time{}, ErrInvalidCredentials
 	}
 
+	if err := checkLockout(user.ID); err != nil {
+		return "", time.Time{}, err
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		if failure := recordFailure(user.ID); failure != nil {
+			return "", time.Time{}, failure
+		}
 		return "", time.Time{}, ErrInvalidCredentials
+	}
+
+	if err := checkTwoFactor(user.ID, code); err != nil {
+		if errors.Is(err, ErrTwoFactorInvalid) {
+			if failure := recordFailure(user.ID); failure != nil {
+				return "", time.Time{}, failure
+			}
+		}
+		return "", time.Time{}, err
+	}
+
+	if err := clearFailures(user.ID); err != nil {
+		return "", time.Time{}, err
 	}
 
 	token, hash, err := newToken()
@@ -89,14 +115,30 @@ func Login(name, password string) (string, time.Time, error) {
 	return token, expiresAt, nil
 }
 
+func Unlock(name string) error {
+	user, err := store.UserByName(db.DB, strings.TrimSpace(name))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUnknownUser
+		}
+		return err
+	}
+
+	return clearFailures(user.ID)
+}
+
 func Logout(token string) error {
 	return store.DeleteSession(db.DB, hashToken(token))
 }
 
 func Register(name, password string, isAdmin bool) error {
 	name = strings.TrimSpace(name)
-	if name == "" || password == "" {
+	if name == "" {
 		return ErrInvalidCredentials
+	}
+
+	if err := checkClientHash(password); err != nil {
+		return err
 	}
 
 	if _, err := store.UserByName(db.DB, name); err == nil {
@@ -135,6 +177,10 @@ func ensureAdmin() error {
 		return errors.New("ADMIN_USER and ADMIN_PASSWORD not set")
 	}
 
+	if len(password) < minPasswordLength {
+		return ErrPasswordTooShort
+	}
+
 	count, err := store.CountUsers(db.DB)
 	if err != nil {
 		return err
@@ -143,7 +189,7 @@ func ensureAdmin() error {
 		return nil
 	}
 
-	return Register(name, password, true)
+	return Register(name, clientHash(name, password), true)
 }
 
 func newToken() (string, string, error) {

@@ -26,12 +26,29 @@ services:
       PORT: 3000
       API_URL: http://backend:8080
       SESSION_COOKIE_SECURE: "true"
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
 
+  proxy:
+    image: caddy:2.10-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
 volumes:
   backend-data:
+  caddy-data:
+  caddy-config:

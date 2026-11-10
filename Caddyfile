@@ -1,0 +1,6 @@
+{$SITE_ADDRESS} {
+	tls internal
+
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}

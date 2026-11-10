@@ -1,5 +1,6 @@
-import { Link } from "react-router";
 import type { Route } from "./+types/home";
+import { Page } from "../components/page";
+import { Panel } from "../components/panel";
 import { api } from "../lib/api";
 
 export function meta() {
@@ -19,22 +20,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { online } = loaderData;
 
   return (
-    <main className="w-full p-8">
-      <h1 className="text-3xl font-semibold text-ctp-mauve">Home V4</h1>
-
-      <p className="mt-6 flex items-center gap-2 text-ctp-subtext0">
-        <span
-          className={`size-2 rounded-full ${online ? "bg-ctp-green" : "bg-ctp-red"}`}
-        />
-        Backend {online ? "reachable" : "unreachable"}
-      </p>
-
-      <Link
-        to="/login"
-        className="mt-8 inline-block rounded-md bg-ctp-surface0 px-4 py-2 hover:bg-ctp-surface1"
-      >
-        Login
-      </Link>
-    </main>
+    <Page title="home-v4" icon="home">
+      <Panel title="Backend">
+        <p className="flex items-center gap-2 text-ctp-subtext0">
+          <span
+            className={`size-2.5 rounded-full ${
+              online ? "bg-ctp-green" : "bg-ctp-red"
+            }`}
+          />
+          {online ? "reachable" : "unreachable"}
+        </p>
+      </Panel>
+    </Page>
   );
 }

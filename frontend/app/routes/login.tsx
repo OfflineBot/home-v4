@@ -1,7 +1,10 @@
-import { Form, redirect } from "react-router";
+import { useState } from "react";
+import { Form, useNavigation, useSubmit } from "react-router";
 import type { Route } from "./+types/login";
+import { Page } from "../components/page";
+import { Panel } from "../components/panel";
 import { api } from "../lib/api";
-import { sessionCookie } from "../lib/session";
+import { hashPassword } from "../lib/password";
 
 export function meta() {
   return [{ title: "Login" }];
@@ -14,75 +17,73 @@ export async function action({ request }: Route.ActionArgs) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      name: form.get("name"),
-      password: form.get("password"),
+      email: form.get("email"),
+      passwordHash: form.get("passwordHash"),
     }),
   });
 
   if (!res.ok) {
-    return { error: "Wrong name or password" };
+    return { error: `Backend responded with ${res.status}` };
   }
-
-  const { token, expires_at } = await res.json();
-  const staySignedIn = form.get("remember") !== null;
-
-  return redirect("/", {
-    headers: {
-      "Set-Cookie": await sessionCookie.serialize(
-        token,
-        staySignedIn ? { expires: new Date(expires_at) } : {},
-      ),
-    },
-  });
+  return { error: null };
 }
 
+const field =
+  "h-9 rounded-md border border-ctp-surface1 bg-ctp-mantle px-3 text-ctp-text outline-none focus:border-ctp-mauve";
+
 export default function Login({ actionData }: Route.ComponentProps) {
+  const submit = useSubmit();
+  const navigation = useNavigation();
+  const [hashing, setHashing] = useState(false);
+  const busy = hashing || navigation.state !== "idle";
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
+
+    // the plaintext must not reach the server, so it never goes into the submit
+    form.delete("password");
+
+    setHashing(true);
+    try {
+      form.set("passwordHash", await hashPassword(password, email));
+    } finally {
+      setHashing(false);
+    }
+
+    submit(form, { method: "post" });
+  }
+
   return (
-    <main className="w-full p-8">
-      <h1 className="text-2xl font-semibold text-ctp-mauve">Login</h1>
+    <Page title="Login" color="mauve" icon="user">
+      <Panel>
+        <Form method="post" onSubmit={onSubmit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-ctp-subtext0">Email</span>
+            <input type="email" name="email" required className={field} />
+          </label>
 
-      <Form method="post" className="mt-8 flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm text-ctp-subtext0">Name</span>
-          <input
-            type="text"
-            name="name"
-            required
-            className="rounded-md border border-ctp-surface1 bg-ctp-mantle px-3 py-2 outline-none focus:border-ctp-mauve"
-          />
-        </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-ctp-subtext0">Password</span>
+            <input type="password" name="password" required className={field} />
+          </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm text-ctp-subtext0">Password</span>
-          <input
-            type="password"
-            name="password"
-            required
-            className="rounded-md border border-ctp-surface1 bg-ctp-mantle px-3 py-2 outline-none focus:border-ctp-mauve"
-          />
-        </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="mt-2 h-9 cursor-pointer self-start rounded-md bg-ctp-mauve px-4 text-sm font-medium text-ctp-crust outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ctp-overlay0 disabled:cursor-wait disabled:opacity-60"
+          >
+            {hashing ? "Hashing..." : busy ? "Signing in..." : "Sign in"}
+          </button>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="remember"
-            defaultChecked
-            className="size-4 accent-ctp-mauve"
-          />
-          <span className="text-sm text-ctp-subtext0">Stay signed in</span>
-        </label>
-
-        <button
-          type="submit"
-          className="mt-2 rounded-md bg-ctp-mauve px-4 py-2 font-medium text-ctp-crust hover:opacity-90"
-        >
-          Sign in
-        </button>
-      </Form>
-
-      {actionData?.error && (
-        <p className="mt-4 text-sm text-ctp-red">{actionData.error}</p>
-      )}
-    </main>
+          {actionData?.error && (
+            <p className="text-sm text-ctp-red">{actionData.error}</p>
+          )}
+        </Form>
+      </Panel>
+    </Page>
   );
 }
