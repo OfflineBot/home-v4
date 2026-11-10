@@ -1,3 +1,9 @@
+FROM node:24-alpine AS dev
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+CMD ["npm", "run", "dev"]
+
 FROM node:24-alpine AS development-dependencies-env
 COPY . /app
 WORKDIR /app
@@ -14,7 +20,7 @@ COPY --from=development-dependencies-env /app/node_modules /app/node_modules
 WORKDIR /app
 RUN npm run build
 
-FROM node:24-alpine
+FROM node:24-alpine AS prod
 COPY ./package.json package-lock.json /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build

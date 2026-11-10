@@ -7,4 +7,11 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      "/api": process.env.API_URL ?? "http://localhost:8080",
+    },
+  },
 });

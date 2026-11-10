@@ -1,21 +1,24 @@
 services:
   backend:
-    context: ./backend
-    target: dev
-  environment:
-    PORT: 8080
-  volumes:
-    - ./backend:/app
-  ports:
-    - "8080:8080"
+    build:
+      context: ./backend
+      target: dev
+    environment:
+      PORT: 8080
+      DB_PATH: /data/home.db
+    volumes:
+      - ./backend:/app
+      - ./.data:/data
+    ports:
+      - "8080:8080"
 
   frontend:
     build:
       context: ./frontend
       target: dev
     environment:
-      API_URL: https://backend:8080
-    volumes: 
+      API_URL: http://backend:8080
+    volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:

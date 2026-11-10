@@ -3,27 +3,33 @@ services:
     build:
       context: ./backend
       target: prod
-      environment:
-        PORT: 8080
-      expose:
-        - "8080"
-      restart: unless-stopped
-      healthcheck:
-        test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/api/health"]
-        interval: 30s
-        timeout: 3s
-        retries: 3
+    environment:
+      PORT: 8080
+      DB_PATH: /data/home.db
+    volumes:
+      - backend-data:/data
+    expose:
+      - "8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
-    frontend:
-      build:
-        context: ./frontend
-        target: prod
-      environment:
-        PORT: 3000
-        API_URL: http://backend:8080
-      ports:
-        - "3000:3000"
-      depends_on:
-        backend:
-          condition: service_healthy
-      restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    environment:
+      PORT: 3000
+      API_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-data:

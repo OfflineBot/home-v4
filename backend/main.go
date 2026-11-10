@@ -10,11 +10,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-
 func health(c fiber.Ctx) error {
 	return c.SendStatus(200)
 }
-
 
 func main() {
 	port := os.Getenv("PORT")
@@ -32,8 +30,7 @@ func main() {
 
 	api := app.Group("/api")
 	api.Get("/health", health)
-	api.Get("/api", routes.CollectRoutes)
+	routes.CollectRoutes(api)
 
 	log.Fatal(app.Listen(":" + port))
 }
-
