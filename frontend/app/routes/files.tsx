@@ -5,7 +5,7 @@ import { FileBrowser } from "../components/files/browser";
 import { Page } from "../components/page";
 import { buttonClass } from "../components/setting-row";
 import { api, unreachableStatus } from "../lib/api";
-import { filesError, normalizePath, type Listing, type Usage } from "../lib/files";
+import { filesError, normalizePath, toListing, type Usage } from "../lib/files";
 import { archiveInfo } from "../lib/files.server";
 import { navColor } from "../lib/nav";
 import { requireToken } from "../lib/session";
@@ -40,7 +40,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   return {
-    listing: (await list.json()) as Listing,
+    listing: toListing(await list.json().catch(() => null)),
     usage: usage.ok ? ((await usage.json()) as Usage) : null,
     archive,
     error: null,

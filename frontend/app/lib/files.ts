@@ -13,6 +13,14 @@ export type Listing = {
   entries: FileEntry[];
 };
 
+export function toListing(raw: Partial<Listing> | null | undefined): Listing {
+  return {
+    path: raw?.path ?? "/",
+    parent: raw?.parent ?? null,
+    entries: Array.isArray(raw?.entries) ? raw.entries : [],
+  };
+}
+
 export type Usage = {
   folder: string;
   used_bytes: number;
@@ -192,7 +200,7 @@ export const filesApi = {
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new FilesError(data?.error, res.status);
-    return data as Listing;
+    return toListing(data);
   },
   mkdir: (path: string) => send({ op: "mkdir", path }),
   move: (path: string, to: string, overwrite = false) => send({ op: "move", path, to, overwrite }),

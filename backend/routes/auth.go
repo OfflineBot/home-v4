@@ -21,6 +21,9 @@ func authRouter(r fiber.Router) {
 	r.Use(limiter.New(limiter.Config{
 		Max:        authRateMax,
 		Expiration: authRateWindow,
+		Next: func(c fiber.Ctx) bool {
+			return c.Method() == fiber.MethodGet
+		},
 	}))
 
 	r.
