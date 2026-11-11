@@ -3,10 +3,13 @@ services:
     build:
       context: ./backend
       target: prod
-    env_file: .env
     environment:
       PORT: 8080
       DB_PATH: /data/home.db
+      SESSION_TTL_MINUTES: ${SESSION_TTL_MINUTES:-10080}
+      ADMIN_USER: ${ADMIN_USER:?}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?}
+      TOTP_SECRET_KEY: ${TOTP_SECRET_KEY:?}
       WOL_SOCKET: /run/wol/wol.sock
       N8N_URL: http://n8n:5678
       AUTOMATION_BACKEND_URL: http://backend:8080
@@ -57,7 +60,8 @@ services:
     restart: unless-stopped
 
   n8n:
-    image: n8nio/n8n:2.47.4
+    build:
+      context: ./n8n
     environment:
       N8N_HOST: n8n
       N8N_PORT: 5678
@@ -75,10 +79,8 @@ services:
       N8N_RESTRICT_FILE_ACCESS_TO: /home/node/.n8n-files
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "336"
-      N8N_CUSTOM_EXTENSIONS: /opt/home-v4-nodes
     volumes:
       - n8n-data:/home/node/.n8n
-      - ./n8n/nodes:/opt/home-v4-nodes:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5678/healthz || exit 1"]
@@ -91,25 +93,23 @@ services:
     image: cloudflare/cloudflared:2026.10.7
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?}
     depends_on:
       - proxy
     restart: unless-stopped
-    profiles:
-      - tunnel
 
   proxy:
-    image: caddy:2.10-alpine
+    build:
+      context: ./proxy
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS}
+      SITE_ADDRESS: ${SITE_ADDRESS:-home.localhost}
       PAGES_ADDRESS: ${PAGES_ADDRESS:-pages.localhost}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "8080"
+      - "8081"
     depends_on:
       - frontend
     restart: unless-stopped
