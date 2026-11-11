@@ -21,16 +21,51 @@ root.tsx                   h-screen, bg-ctp-crust — the frame
 Tone follows elevation: the further forward something is, the lighter it gets.
 The frame is darkest so the chrome recedes and the eye lands on the content.
 
-| tone | hex | used for |
-| --- | --- | --- |
-| `crust` | #11111b | shell + sidebar — the frame |
-| `mantle` | #181825 | content card, inputs |
-| `base` | #1e1e2e | panels, menu popup — furthest forward |
-| `surface0` | #313244 | borders, hover |
-| `surface1` | #45475a | input borders, avatar ring |
+**Components never name a palette colour.** They use semantic roles, and each
+role points at a different tone per theme, because the same tone does not hold
+contrast in both:
+
+| role | mocha | latte | used for |
+| --- | --- | --- | --- |
+| `ui-frame` | crust | crust | shell + sidebar |
+| `ui-surface` | mantle | mantle | content card |
+| `ui-raised` | base | base | panels, menu popup |
+| `ui-field` | mantle | mantle | inputs |
+| `ui-border` | surface1 | surface2 | card + panel borders |
+| `ui-hover` | surface0 | surface0 | row hover |
+| `ui-fg` | text | text | body text |
+| `ui-fg-muted` | subtext0 | subtext1 | secondary text, nav labels |
+| `ui-fg-faint` | overlay2 | subtext1 | panel titles |
+| `ui-ring` | overlay0 | subtext0 | focus ring |
+| `ui-danger` | red | red | destructive actions |
+
+So `bg-ui-raised`, `text-ui-fg-muted`, `border-ui-border` — not `bg-ctp-base`.
+Only genuine status colours stay direct: `ctp-green` and `ctp-mauve` for the
+wordmark. Destructive UI goes through `ui-danger`, including its tints —
+`bg-[color-mix(in_oklab,var(--ui-danger)_14%,transparent)]` — so the red adapts
+per theme instead of being a fixed palette value that fights the background.
 
 Do not invert this by making panels darker than the surface they sit on — a
 recessed card reads as an input field, not as a module.
+
+### Accent colours and contrast
+
+Every combination holds WCAG AA (4.5:1 text, 3:1 UI) in **both** themes;
+verified, not estimated. Worst case mocha 7.58:1, latte 4.69:1.
+
+An accent therefore exists in two forms:
+
+- `var(--accent)` — the raw colour, for icons, tints and borders
+- `var(--accent-fg)` — the text-safe variant
+
+Latte accents are too light for text on a light surface (pink on mantle is
+2.17:1). `--accent-fg` mixes the accent toward `--ui-fg` by `--accent-mix`,
+which is `100%` in mocha (no change) and `30%` in latte. Use `--accent` on
+surfaces and icons, `--accent-fg` on anything that is read as text.
+
+A new scheme therefore needs a `:root[data-theme="..."]` block with the palette,
+any role overrides, and an `--accent-mix` that keeps the worst accent above
+4.5:1.
 
 The active nav row is tinted with its own accent, not a neutral grey:
 `bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]` plus
@@ -49,9 +84,9 @@ Everything is a multiple of 4px. Only these values are used:
 | `size-4` | 16px | every icon |
 | `p-3` | 12px | shell gap, sidebar vertical padding |
 | `p-4` | 16px | content body, panel padding |
-| `px-2` / `px-0` | 8 / 0px | row padding, open / collapsed |
+| `px-2` | 8px | row padding, both states |
 | `ml-3` / `ml-0 w-0` | 12 / 0px | label offset, open / collapsed |
-| `w-56` / `w-11` | 224 / 44px | sidebar open / collapsed |
+| `w-56` / `w-13` | 224 / 52px | sidebar open / collapsed |
 
 The toggle row and the page header are both `h-12` and both start 12px from the
 top, so their centers land on the same horizontal line. Keep it that way when
@@ -64,9 +99,13 @@ centered inside the strip from the window edge to the card, not inside the
 sidebar box in isolation. Adding left padding centers it too, but wastes 12px.
 
 ```
-44px sidebar: 4px (aside px-1) + 8px (row px-2) + 20px slot + 8 + 4 = 44
-icon lands at 14..30, card starts at 44 -> 14px of air on each side
+52px sidebar: 8px (aside px-2) + 8px (row px-2) + 20px slot + 8 + 8 = 52
+icon lands at 18..34, card starts at 52 -> 18px of air on each side
 ```
+
+Because the padding is now `px-2` in both states, the icon does not move at all
+when collapsing — only the width and the label animate. Measured across the
+transition, icon-x stays at 18 from first frame to last.
 
 Two rules keep this stable:
 
@@ -143,6 +182,80 @@ page header, `text-ctp-subtext0` for neutral rows.
 A nav entry resolves its icon by its `slug`, so `slug: "lights"` needs a
 `lights` key in `paths`. Unknown names fall back to the `pages` icon.
 
+## Settings
+
+`/settings` is the first real domain and uses a second, narrower nav inside the
+page: groups on the left, content on the right. That pattern was chosen because
+Connections and Background sync will grow — a horizontal tab bar runs out of
+room, a vertical list does not.
+
+```
+routes/settings/layout.tsx     the two column shell, loads /api/auth/me
+  index.tsx                    redirects to /settings/profile
+  profile / connections / security / sync        -> group "Account"
+  appearance / notifications                     -> group "Site"
+  delete                       below a divider, red on hover
+```
+
+Adding a section is two steps: an entry in `app/lib/settings-nav.ts` (with an
+icon of the same key in `icons.tsx`) and a route in `routes.ts`. Nothing else
+knows about the list.
+
+Note the nesting rule: child paths under `route("settings", ...)` must be
+relative (`"profile"`), never absolute. `prefix("")` produces absolute paths and
+React Router rejects the config with *"An absolute child route path must start
+with the combined path of all its parent routes"*.
+
+Layout is two blocks side by side, both in the same card style as `<Panel>`:
+the nav on the left, the content on the right. The nav uses `self-start` so it
+hugs its items instead of stretching to full height — otherwise "Delete account"
+floats at the bottom edge and stops reading as part of the block.
+
+Inside the content block: `<SettingsPanel>` is the card, `<SettingsSection>` is
+a titled region separated by a rule, `<SettingRow>` is one line — label and hint
+left, control right. A page never nests a card in a card, and a row costs one
+line of height, which is what keeps a long settings list readable.
+
+### Where controls go
+
+**An action sits below what it acts on, not to its right.** `<SettingRow>`
+stacks label, hint, inputs and then the button, all left aligned. A control
+parked at the far right of a wide card forces the pointer across the whole card
+after the user just finished typing — the distance is the cost (Fitts's law),
+and it grows with every pixel the card gets wider.
+
+That gives the screen two zones, and new domains should keep them:
+
+- **left** — everything you operate: navigation, forms, buttons
+- **right** — content you read: a mail body, a document, a log
+
+Buttons that belong to that content (reply, delete, mark read) go with the
+content, not back on the left. The rule is proximity to the thing being acted
+on, not a fixed column.
+
+Inputs use `fieldStackClass` so fields and their button share one axis and one
+max width.
+
+### What is actually wired
+
+| section | backend | state |
+| --- | --- | --- |
+| Profile | `GET /api/auth/me` | name and role shown; **no rename endpoint**, field disabled |
+| Security — password | `POST /api/auth/password` | live |
+| Security — two factor | `POST /api/auth/2factor/{setup,confirm,disable}` | live |
+| Appearance | none needed | live, `theme` cookie + `data-theme` on `<html>` |
+| Connections, Background sync, Notifications | none | placeholders |
+| Delete account | none | disabled; the backend only lets an **admin** delete users |
+
+The two factor flow mirrors the backend: `setup` returns a secret, the user adds
+it to their app, `confirm` activates it. Every two factor call wants the
+password again, so it is hashed once and held in component state for the length
+of the flow rather than asking twice.
+
+Theme note: the switch writes a cookie and sets `data-theme` immediately, so it
+applies without a reload. The backend has `settings.SetTheme` but no route for
+it, so the choice is per browser for now.
+
 ## Adding a domain
 
 1. Add an entry to `app/lib/nav.ts` — `slug`, `label`, and a Catppuccin `color`.
@@ -175,13 +288,20 @@ counts as open.
 ## Password hashing
 
 The password is hashed in the browser and only the hash is submitted. Verified:
-a login POST carries `email` and `passwordHash`, the plaintext appears in no
+a login POST carries `name` and `passwordHash`, the plaintext appears in no
 request.
 
 `app/lib/password.ts` derives it with PBKDF2-SHA256, 600k iterations (OWASP
-2023), salt `home-v4:<email lowercased and trimmed>`, 256 bits as hex. The salt
+2023), salt `home-v4:<name lowercased and trimmed>`, 256 bits as hex. The salt
 is deterministic on purpose — the client must derive the same value without
 asking the server first, which would leak whether an account exists.
+
+The backend derives the same value in `clientHash` (`services/auth/password.go`)
+for the bootstrap admin, so the two implementations must stay in sync. Verified
+identical across WebCrypto, Go and python hashlib for the same inputs,
+including the trimming and lowercasing. Because the name is normalized here and
+`users.name` is `COLLATE NOCASE`, two spellings that differ only in case are one
+account.
 
 It runs in `onSubmit`, **not** in the `action`. An action executes on the Node
 server, so hashing there would already have sent the plaintext over the wire.
@@ -199,8 +319,119 @@ Two things this does not do:
   breaks login — that is the point where a reverse proxy with HTTPS stops being
   optional.
 
-`/api/auth/login` is still registered as GET in the backend, so a submit
-currently answers 405.
+## Auth and layouts
+
+Two layout routes, so the shell is not shared:
+
+```
+layouts/auth.tsx   /login /register     centered card, no sidebar
+layouts/app.tsx    / and /:page         sidebar + content card
+routes/logout.tsx  POST only            revokes the session, clears the cookie
+```
+
+`layouts/app.tsx` is the guard: its loader redirects to `/login` when there is
+no `session` cookie, and it validates the token against `GET /api/auth/me`. On
+`401` or `403` it redirects to `/login` with an expired `Set-Cookie`, so a
+revoked or expired session cannot leave you in a shell where every request
+fails. The route data carries `user` (`name`, `is_admin`, `two_factor`), which
+child routes read with `useRouteLoaderData("layouts/app")`. When the backend is
+unreachable, `user` is `null` and the shell still renders. `layouts/auth.tsx` does the reverse — with a session it
+sends you to `/`. Neither page can render the other's chrome, which is why the
+sidebar is simply absent when logged out rather than hidden with CSS.
+
+The session cookie is `HttpOnly`, so only the loader reads it, never the
+browser. Logout therefore cannot clear it from JS: it posts to `/logout`, which
+sends `POST /api/auth/logout` with the token so the server drops the session,
+then answers with an expired `Set-Cookie`. Clearing the cookie alone is not
+enough - the token would stay valid until it expires.
+
+### Reading the session cookie
+
+`sessionCookie.serialize()` does **not** store the raw value: React Router
+JSON-encodes it and then base64s it. So a token saved as `abc123` arrives in the
+header as `session=ImFiYzEyMyI`.
+
+Therefore never read the cookie with a regex. `readSession()` goes through
+`sessionCookie.parse()` and is async for that reason, as is every loader calling
+it.
+
+Getting this wrong fails in a way that looks like a backend bug: the login
+succeeds, the cookie is set, then the next loader sends the base64 string as a
+bearer token, the backend answers 401, and the layout clears the session it just
+received. The browser shows two `Set-Cookie` headers in a row — one setting the
+session, one expiring it — and the user lands back on `/login` with no error.
+
+### Errors never move the layout
+
+Form errors are shown by `<Toast>`, fixed at the top right. They are not
+rendered inline, because an inline message pushes everything below it down the
+moment it appears — a layout shift caused by the user's own click.
+
+`api()` in `app/lib/api.ts` never throws. A dead or hanging backend becomes a
+`503` response (`unreachableStatus`), with an 8s `AbortSignal.timeout`, so it
+surfaces as a normal inline failure instead of reaching the error boundary.
+Every route that calls the backend must check `unreachableStatus` *before* its
+content-specific branches, otherwise an outage reads as "wrong password".
+
+### Two factor is a second step
+
+The code field does not sit next to the password as an optional input. The form
+submits name + password first; only when the backend answers
+`two_factor_required` does the route return `{ twoFactorRequired: true }` and
+the form switches steps.
+
+Name and password are then hidden rather than unmounted, so their values stay
+in the DOM and can be re-hashed for the second submit.
+
+`<CodeInput>` renders six boxes grouped 3+3, with auto-advance, backspace,
+arrow keys and paste. When all six are filled it submits **once** on its own.
+After a rejection `autoSubmit` goes false and the user presses Verify — so a
+wrong code does not spin in a resubmit loop.
+
+### What the frontend sends and expects
+
+`POST /api/auth/login` and `POST /api/auth/register`:
+
+```json
+{ "name": "<name>", "passwordHash": "<64 hex chars>", "code": "<6 digits>" }
+```
+
+`code` is only sent by the login form and may be empty. Register sends `name`
+and `passwordHash` only.
+
+Register does **not** answer with a token. It answers `201` with an empty body,
+because every new account starts unapproved; `409` means the name is taken and
+`400` means `passwordHash` was not 64 hex characters.
+
+Changing a password is `POST /api/auth/password` with `passwordHash` (the current
+one) and `newPasswordHash`, both derived the same way. It answers `204` and drops
+every session of that user, so the next loader call gets a `401` and the layout
+guard sends the browser to `/login` - a password change signs you out everywhere by
+design.
+
+A protected request carries the token as `Authorization: Bearer <token>`.
+Everything under `/api` needs it except `/api/health`, `/api/auth/login` and
+`/api/auth/register`. In a loader, `requireToken(request)` from
+`app/lib/session.ts` returns it or throws a redirect to `/login`.
+
+On success the backend answers `200` with
+
+```json
+{ "token": "...", "expires_at": "2026-11-18T22:00:00Z" }
+```
+
+`expires_at` goes through `new Date(...)`, so it must be RFC3339 — which is what
+Go's `time.Time` marshals to. Unix seconds would be read as 1970 and the cookie
+would expire instantly.
+
+The route then sets the cookie itself via `sessionCookie.serialize(token)`; the
+backend does **not** send `Set-Cookie`. Cookie attributes therefore live in
+`app/lib/session.ts`: `HttpOnly`, `SameSite=Lax`, and `Secure` whenever
+`NODE_ENV=production`.
+
+Failures are mapped to inline messages, never a redirect: `two_factor_required`
+and `not_approved` in the body, `423` for a locked account, `429` for rate
+limiting, anything else becomes "Wrong name or password".
 
 ## Backend access
 

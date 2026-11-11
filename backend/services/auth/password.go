@@ -4,12 +4,17 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
 	minPasswordLength = 8
-	clientHashPrefix  = "home-v4"
-	clientHashLength  = sha256.Size * 2
+	clientHashPrefix  = "home-v4:"
+	clientHashRounds  = 600000
+	clientHashBytes   = sha256.Size
+	clientHashLength  = clientHashBytes * 2
 )
 
 var (
@@ -17,9 +22,15 @@ var (
 	ErrNotClientHashed  = errors.New("password is not a client hash")
 )
 
+func normalizeName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
 func clientHash(name, password string) string {
-	sum := sha256.Sum256([]byte(clientHashPrefix + ":" + name + ":" + password))
-	return hex.EncodeToString(sum[:])
+	salt := clientHashPrefix + normalizeName(name)
+	key := pbkdf2.Key([]byte(password), []byte(salt), clientHashRounds, clientHashBytes, sha256.New)
+
+	return hex.EncodeToString(key)
 }
 
 func checkClientHash(password string) error {

@@ -27,5 +27,14 @@ export const settingsItem: NavItem = {
 export const allItems: NavItem[] = [...navItems, settingsItem];
 
 export function accent(item: NavItem) {
-  return { "--accent": `var(--ctp-${item.color})` } as CSSProperties;
+  return accentVars(item.color);
+}
+
+// --accent paints surfaces and icons, --accent-fg is the text-safe variant:
+// in a light theme the raw accent does not reach 4.5:1, so it is mixed toward --ui-fg
+export function accentVars(color: string) {
+  return {
+    "--accent": `var(--ctp-${color})`,
+    "--accent-fg": `color-mix(in oklab, var(--ctp-${color}) var(--accent-mix), var(--ui-fg))`,
+  } as CSSProperties;
 }

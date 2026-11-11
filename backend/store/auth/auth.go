@@ -10,6 +10,7 @@ type User struct {
 	Name         string
 	PasswordHash string
 	IsAdmin      bool
+	Approved     bool
 }
 
 func CountUsers(conn *sql.DB) (int, error) {
@@ -27,8 +28,9 @@ func CreateUser(conn *sql.DB, name, passwordHash string, isAdmin bool) error {
 }
 
 func UserByName(conn *sql.DB, name string) (*User, error) {
-	return scanUser(conn.QueryRow(
-		"SELECT id, name, password_hash, is_admin FROM users WHERE name = ?",
+	return scanUser(conn.QueryRow(`
+		SELECT id, name, password_hash, is_admin, approved_at IS NOT NULL
+		FROM users WHERE name = ?`,
 		name,
 	))
 }
@@ -38,12 +40,14 @@ func UserBySession(conn *sql.DB, tokenHash string) (*User, time.Time, error) {
 	var expires string
 
 	err := conn.QueryRow(`
-		SELECT u.id, u.name, u.password_hash, u.is_admin, s.expires_at
+		SELECT u.id, u.name, u.password_hash, u.is_admin,
+			u.approved_at IS NOT NULL, s.expires_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = ? AND s.expires_at > datetime('now')`,
 		tokenHash,
-	).Scan(&user.ID, &user.Name, &user.PasswordHash, &user.IsAdmin, &expires)
+	).Scan(&user.ID, &user.Name, &user.PasswordHash, &user.IsAdmin,
+		&user.Approved, &expires)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -87,9 +91,50 @@ func DeleteExpiredSessions(conn *sql.DB) error {
 	return err
 }
 
+func UpdatePassword(conn *sql.DB, userID int64, passwordHash string) error {
+	result, err := conn.Exec(
+		"UPDATE users SET password_hash = ? WHERE id = ?",
+		passwordHash, userID,
+	)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func ApproveUser(conn *sql.DB, userID int64) error {
+	result, err := conn.Exec(
+		"UPDATE users SET approved_at = datetime('now') WHERE id = ? AND approved_at IS NULL",
+		userID,
+	)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 func scanUser(row *sql.Row) (*User, error) {
 	var user User
-	if err := row.Scan(&user.ID, &user.Name, &user.PasswordHash, &user.IsAdmin); err != nil {
+	err := row.Scan(&user.ID, &user.Name, &user.PasswordHash, &user.IsAdmin, &user.Approved)
+	if err != nil {
 		return nil, err
 	}
 	return &user, nil

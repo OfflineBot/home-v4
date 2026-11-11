@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-:root {
+/* palette: the only place a hex value may appear */
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
   --ctp-rosewater: #f5e0dc;
   --ctp-flamingo: #f2cdcd;
@@ -30,7 +32,8 @@
   --ctp-crust: #11111b;
 }
 
-:root[data-theme="light"] {
+:root[data-theme="light"],
+[data-theme="light"] {
   color-scheme: light;
   --ctp-rosewater: #dc8a78;
   --ctp-flamingo: #dd7878;
@@ -60,9 +63,57 @@
   --ctp-crust: #dce0e8;
 }
 
+/* semantic roles: components use these, never --ctp-* directly.
+   each role points at a different tone per theme so contrast holds in both. */
+:root,
+[data-theme="dark"] {
+  --ui-frame: var(--ctp-crust);
+  --ui-surface: var(--ctp-mantle);
+  --ui-raised: var(--ctp-base);
+  --ui-field: var(--ctp-mantle);
+  --ui-border: var(--ctp-surface1);
+  --ui-border-soft: var(--ctp-surface0);
+  --ui-hover: var(--ctp-surface0);
+  --ui-fg: var(--ctp-text);
+  --ui-fg-muted: var(--ctp-subtext0);
+  --ui-fg-faint: var(--ctp-overlay2);
+  --ui-ring: var(--ctp-overlay0);
+  --ui-danger: var(--ctp-red);
+  --accent-mix: 100%;
+}
+
+:root[data-theme="light"],
+[data-theme="light"] {
+  --ui-frame: var(--ctp-crust);
+  --ui-surface: var(--ctp-mantle);
+  --ui-raised: var(--ctp-base);
+  --ui-field: var(--ctp-mantle);
+  --ui-border: var(--ctp-surface2);
+  --ui-border-soft: var(--ctp-surface1);
+  --ui-hover: var(--ctp-surface0);
+  --ui-fg: var(--ctp-text);
+  --ui-fg-muted: var(--ctp-subtext1);
+  --ui-fg-faint: var(--ctp-subtext1);
+  --ui-ring: var(--ctp-subtext0);
+  --ui-danger: var(--ctp-red);
+  --accent-mix: 30%;
+}
+
 /* inline keeps the var() reference in the utilities, so data-theme switches at runtime */
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-ui-frame: var(--ui-frame);
+  --color-ui-surface: var(--ui-surface);
+  --color-ui-raised: var(--ui-raised);
+  --color-ui-field: var(--ui-field);
+  --color-ui-border: var(--ui-border);
+  --color-ui-border-soft: var(--ui-border-soft);
+  --color-ui-hover: var(--ui-hover);
+  --color-ui-fg: var(--ui-fg);
+  --color-ui-fg-muted: var(--ui-fg-muted);
+  --color-ui-fg-faint: var(--ui-fg-faint);
+  --color-ui-ring: var(--ui-ring);
+  --color-ui-danger: var(--ui-danger);
   --color-ctp-rosewater: var(--ctp-rosewater);
   --color-ctp-flamingo: var(--ctp-flamingo);
   --color-ctp-pink: var(--ctp-pink);

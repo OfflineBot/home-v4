@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -18,12 +17,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const tokenBytes = 32
+const (
+	tokenBytes = 32
+	ContextKey = "user"
+)
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrNameTaken          = errors.New("name already taken")
 	ErrUnknownUser        = errors.New("unknown user")
+	ErrNotApproved        = errors.New("account is not approved yet")
 )
 
 type User = store.User
@@ -89,6 +92,10 @@ func Login(name, password, code string) (string, time.Time, error) {
 		return "", time.Time{}, ErrInvalidCredentials
 	}
 
+	if !user.Approved {
+		return "", time.Time{}, ErrNotApproved
+	}
+
 	if err := checkTwoFactor(user.ID, code); err != nil {
 		if errors.Is(err, ErrTwoFactorInvalid) {
 			if failure := recordFailure(user.ID); failure != nil {
@@ -115,16 +122,25 @@ func Login(name, password, code string) (string, time.Time, error) {
 	return token, expiresAt, nil
 }
 
-func Unlock(name string) error {
-	user, err := store.UserByName(db.DB, strings.TrimSpace(name))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrUnknownUser
-		}
+func ChangePassword(user *User, currentHash, newHash string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentHash)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := checkClientHash(newHash); err != nil {
 		return err
 	}
 
-	return clearFailures(user.ID)
+	stored, err := bcrypt.GenerateFromPassword([]byte(newHash), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	if err := store.UpdatePassword(db.DB, user.ID, string(stored)); err != nil {
+		return err
+	}
+
+	return store.DeleteSessionsByUser(db.DB, user.ID)
 }
 
 func Logout(token string) error {
@@ -189,7 +205,11 @@ func ensureAdmin() error {
 		return nil
 	}
 
-	return Register(name, clientHash(name, password), true)
+	if err := Register(name, clientHash(name, password), true); err != nil {
+		return err
+	}
+
+	return Approve(name)
 }
 
 func newToken() (string, string, error) {

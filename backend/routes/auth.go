@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	userKey        = "user"
 	bearerPrefix   = "Bearer "
 	authRateMax    = 60
 	authRateWindow = time.Minute
@@ -26,17 +25,13 @@ func authRouter(r fiber.Router) {
 
 	r.
 		Post("/login", authLogin).
-		Post("/logout", authLogout)
-
-	authed := r.Group("", authMiddleware)
-	authed.
+		Post("/register", authRegister).
+		Post("/logout", authLogout).
+		Get("/me", authMe).
+		Post("/password", authPassword).
 		Post("/2factor/setup", authTwoFactorSetup).
 		Post("/2factor/confirm", authTwoFactorConfirm).
 		Post("/2factor/disable", authTwoFactorDisable)
-
-	authed.Group("", adminMiddleware).
-		Post("/register", authRegister).
-		Post("/unlock", authUnlock)
 }
 
 func authMiddleware(c fiber.Ctx) error {
@@ -46,22 +41,22 @@ func authMiddleware(c fiber.Ctx) error {
 	}
 
 	user, err := auth.UserByToken(token)
-	if err != nil {
+	if err != nil || !user.Approved {
 		return fiber.ErrUnauthorized
 	}
 
-	fiber.Locals(c, userKey, user)
+	fiber.Locals(c, auth.ContextKey, user)
 	return c.Next()
 }
 
 type credentials struct {
 	Name     string `json:"name"`
-	Password string `json:"password"`
+	Password string `json:"passwordHash"`
 	Code     string `json:"code"`
 }
 
 type twoFactorCode struct {
-	Password string `json:"password"`
+	Password string `json:"passwordHash"`
 	Code     string `json:"code"`
 }
 
@@ -84,8 +79,13 @@ func authLogin(c fiber.Ctx) error {
 		return fiber.ErrTooManyRequests
 	case errors.Is(err, auth.ErrAccountLocked):
 		return fiber.ErrLocked
-	case errors.Is(err, auth.ErrInvalidCredentials),
-		errors.Is(err, auth.ErrTwoFactorInvalid):
+	case errors.Is(err, auth.ErrNotApproved):
+		return c.Status(fiber.StatusForbidden).
+			JSON(fiber.Map{"not_approved": true})
+	case errors.Is(err, auth.ErrTwoFactorInvalid):
+		return c.Status(fiber.StatusUnauthorized).
+			JSON(fiber.Map{"two_factor_required": true, "invalid_code": true})
+	case errors.Is(err, auth.ErrInvalidCredentials):
 		return fiber.ErrUnauthorized
 	case err != nil:
 		return fiber.ErrInternalServerError
@@ -100,7 +100,7 @@ func authTwoFactorSetup(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	user := fiber.Locals[*auth.User](c, userKey)
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
 
 	secret, uri, err := auth.TwoFactorSetup(user, body.Password)
 	switch {
@@ -121,7 +121,7 @@ func authTwoFactorConfirm(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	user := fiber.Locals[*auth.User](c, userKey)
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
 
 	switch err := auth.TwoFactorConfirm(user.ID, body.Code); {
 	case errors.Is(err, auth.ErrTwoFactorInvalid):
@@ -143,7 +143,7 @@ func authTwoFactorDisable(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	user := fiber.Locals[*auth.User](c, userKey)
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
 
 	switch err := auth.TwoFactorDisable(user, body.Password, body.Code); {
 	case errors.Is(err, auth.ErrInvalidCredentials),
@@ -177,22 +177,42 @@ func authRegister(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-func authUnlock(c fiber.Ctx) error {
+func authPassword(c fiber.Ctx) error {
 	var body struct {
-		Name string `json:"name"`
+		PasswordHash    string `json:"passwordHash"`
+		NewPasswordHash string `json:"newPasswordHash"`
 	}
 	if err := c.Bind().JSON(&body); err != nil {
 		return fiber.ErrBadRequest
 	}
 
-	switch err := auth.Unlock(body.Name); {
-	case errors.Is(err, auth.ErrUnknownUser):
-		return fiber.ErrNotFound
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
+
+	switch err := auth.ChangePassword(user, body.PasswordHash, body.NewPasswordHash); {
+	case errors.Is(err, auth.ErrInvalidCredentials):
+		return fiber.ErrUnauthorized
+	case errors.Is(err, auth.ErrNotClientHashed):
+		return fiber.ErrBadRequest
 	case err != nil:
 		return fiber.ErrInternalServerError
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func authMe(c fiber.Ctx) error {
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
+
+	twoFactor, err := auth.TwoFactorConfirmed(user.ID)
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	return c.JSON(fiber.Map{
+		"name":       user.Name,
+		"is_admin":   user.IsAdmin,
+		"two_factor": twoFactor,
+	})
 }
 
 func authLogout(c fiber.Ctx) error {

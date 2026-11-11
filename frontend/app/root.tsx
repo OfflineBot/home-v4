@@ -5,16 +5,19 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import { Page } from "./components/page";
 import { Panel } from "./components/panel";
-import { Sidebar } from "./components/sidebar";
-import { readSidebarOpen } from "./lib/sidebar";
+import { readTheme } from "./lib/theme";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -28,19 +31,21 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function loader({ request }: Route.LoaderArgs) {
-  return { sidebarOpen: readSidebarOpen(request.headers.get("Cookie")) };
+  return { theme: readTheme(request.headers.get("Cookie")) };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useRouteLoaderData<typeof loader>("root");
+
   return (
-    <html lang="en">
+    <html lang="en" data-theme={data?.theme ?? "dark"}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body className="bg-ctp-crust font-sans text-ctp-text">
+      <body className="bg-ui-frame font-sans text-ui-fg">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -49,15 +54,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
-  return (
-    <div className="flex h-screen overflow-hidden py-3 pr-3">
-      <Sidebar defaultOpen={loaderData.sidebarOpen} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Outlet />
-      </div>
-    </div>
-  );
+export default function App() {
+  return <Outlet />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -79,9 +77,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   return (
     <Page title={message} color="red">
       <Panel>
-        <p className="text-ctp-subtext0">{details}</p>
+        <p className="text-ui-fg-muted">{details}</p>
         {stack && (
-          <pre className="mt-4 w-full overflow-x-auto rounded-md bg-ctp-crust p-4 text-sm">
+          <pre className="mt-4 w-full overflow-x-auto rounded-md bg-ui-field p-4 text-sm">
             <code>{stack}</code>
           </pre>
         )}

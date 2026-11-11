@@ -14,7 +14,7 @@ export default function Domain({ params }: Route.ComponentProps) {
     return (
       <Page title="Not found" color="red">
         <Panel>
-          <p className="text-ctp-subtext0">No page for "{params.page}".</p>
+          <p className="text-ui-fg-muted">No page for "{params.page}".</p>
         </Panel>
       </Page>
     );
@@ -23,7 +23,7 @@ export default function Domain({ params }: Route.ComponentProps) {
   return (
     <Page title={item.label} color={item.color} icon={item.slug}>
       <Panel title="Status">
-        <p className="text-ctp-subtext0">
+        <p className="text-ui-fg-muted">
           No backend route yet — routes/domain_page/{item.slug}.go is empty.
         </p>
       </Panel>

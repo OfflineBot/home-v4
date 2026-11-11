@@ -22,7 +22,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <Page title="home-v4" icon="home">
       <Panel title="Backend">
-        <p className="flex items-center gap-2 text-ctp-subtext0">
+        <p className="flex items-center gap-2 text-ui-fg-muted">
           <span
             className={`size-2.5 rounded-full ${
               online ? "bg-ctp-green" : "bg-ctp-red"

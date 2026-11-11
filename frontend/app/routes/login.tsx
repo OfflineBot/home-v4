@@ -1,10 +1,8 @@
-import { useState } from "react";
-import { Form, useNavigation, useSubmit } from "react-router";
+import { redirect } from "react-router";
 import type { Route } from "./+types/login";
-import { Page } from "../components/page";
-import { Panel } from "../components/panel";
-import { api } from "../lib/api";
-import { hashPassword } from "../lib/password";
+import { AuthForm } from "../components/auth-form";
+import { api, unreachableStatus } from "../lib/api";
+import { sessionCookie } from "../lib/session";
 
 export function meta() {
   return [{ title: "Login" }];
@@ -17,73 +15,59 @@ export async function action({ request }: Route.ActionArgs) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      email: form.get("email"),
+      name: form.get("name"),
       passwordHash: form.get("passwordHash"),
+      code: form.get("code"),
     }),
   });
 
-  if (!res.ok) {
-    return { error: `Backend responded with ${res.status}` };
+  if (res.status === unreachableStatus) {
+    return { error: "Backend not reachable" };
   }
-  return { error: null };
-}
 
-const field =
-  "h-9 rounded-md border border-ctp-surface1 bg-ctp-mantle px-3 text-ctp-text outline-none focus:border-ctp-mauve";
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
 
-export default function Login({ actionData }: Route.ComponentProps) {
-  const submit = useSubmit();
-  const navigation = useNavigation();
-  const [hashing, setHashing] = useState(false);
-  const busy = hashing || navigation.state !== "idle";
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "");
-    const password = String(form.get("password") ?? "");
-
-    // the plaintext must not reach the server, so it never goes into the submit
-    form.delete("password");
-
-    setHashing(true);
-    try {
-      form.set("passwordHash", await hashPassword(password, email));
-    } finally {
-      setHashing(false);
+    if (data?.two_factor_required) {
+      // not an error on the first step: the form switches to asking for a code
+      return {
+        twoFactorRequired: true,
+        error: data.invalid_code ? "Wrong code" : null,
+      };
+    }
+    if (data?.not_approved) {
+      return { error: "An admin has to approve this account first" };
+    }
+    if (res.status === 423) {
+      return { error: "Account locked, an admin has to unlock it" };
+    }
+    if (res.status === 429) {
+      return { error: "Too many attempts, try again later" };
     }
 
-    submit(form, { method: "post" });
+    return { error: "Wrong name or password" };
   }
 
+  const { token, expires_at } = await res.json();
+
+  return redirect("/", {
+    headers: {
+      "Set-Cookie": await sessionCookie.serialize(token, {
+        expires: new Date(expires_at),
+      }),
+    },
+  });
+}
+
+export default function Login({ actionData }: Route.ComponentProps) {
   return (
-    <Page title="Login" color="mauve" icon="user">
-      <Panel>
-        <Form method="post" onSubmit={onSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-ctp-subtext0">Email</span>
-            <input type="email" name="email" required className={field} />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-ctp-subtext0">Password</span>
-            <input type="password" name="password" required className={field} />
-          </label>
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="mt-2 h-9 cursor-pointer self-start rounded-md bg-ctp-mauve px-4 text-sm font-medium text-ctp-crust outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ctp-overlay0 disabled:cursor-wait disabled:opacity-60"
-          >
-            {hashing ? "Hashing..." : busy ? "Signing in..." : "Sign in"}
-          </button>
-
-          {actionData?.error && (
-            <p className="text-sm text-ctp-red">{actionData.error}</p>
-          )}
-        </Form>
-      </Panel>
-    </Page>
+    <AuthForm
+      title="Sign in"
+      submitLabel="Sign in"
+      twoFactorRequired={actionData?.twoFactorRequired}
+      error={actionData?.error}
+      altHref="/register"
+      altLabel="No account yet? Register"
+    />
   );
 }

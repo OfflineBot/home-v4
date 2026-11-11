@@ -27,6 +27,17 @@ var schemaFiles = []string{
 
 var DB *sql.DB
 
+type extraSchema struct {
+	name string
+	sql  string
+}
+
+var extraSchemas []extraSchema
+
+func AddSchema(name, schema string) {
+	extraSchemas = append(extraSchemas, extraSchema{name: name, sql: schema})
+}
+
 func Setup() error {
 	path := os.Getenv("DB_PATH")
 	if path == "" {
@@ -48,6 +59,12 @@ func Setup() error {
 
 		if _, err := conn.Exec(string(schema)); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
+		}
+	}
+
+	for _, extra := range extraSchemas {
+		if _, err := conn.Exec(extra.sql); err != nil {
+			return fmt.Errorf("%s: %w", extra.name, err)
 		}
 	}
 
