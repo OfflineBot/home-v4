@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { DayTimeline } from "./day-timeline";
 import {
-  AverageTile,
+  hasUnread,
   LightsTile,
   MailTile,
   NoticesTile,
-  type AverageSummary,
+  useSeenBaseline,
   type MailSummary,
   type NoticeSummary,
 } from "./tiles";
@@ -29,7 +29,6 @@ type ClockCardProps = {
   now: number;
   plan: DayPlan;
   calendarFailed: boolean;
-  average: AverageSummary;
   mail: MailSummary;
   notices: NoticeSummary;
   lights: Light[];
@@ -58,8 +57,9 @@ function dayHref(day: string) {
 const pressable =
   "rounded-xl outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none";
 
-export function ClockCard({ now, plan, calendarFailed, average, mail, notices, lights }: ClockCardProps) {
+export function ClockCard({ now, plan, calendarFailed, mail, notices, lights }: ClockCardProps) {
   const period = periodAt(now);
+  useSeenBaseline(notices);
   const focus = calendarFailed ? null : plan.focus;
   const focusLabel = focus && !focus.isToday && focus.items[0] ? dayLabel(focus.items[0].start, now) : null;
 
@@ -87,11 +87,10 @@ export function ClockCard({ now, plan, calendarFailed, average, mail, notices, l
         </Link>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none">
-        <AverageTile average={average} />
-        <MailTile mail={mail} />
-        <LightsTile lights={lights} />
+      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]">
+        {hasUnread(mail) && <MailTile mail={mail} />}
         <NoticesTile notices={notices} />
+        <LightsTile lights={lights} />
       </div>
     </div>
   );

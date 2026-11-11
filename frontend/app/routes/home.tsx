@@ -20,7 +20,7 @@ import {
   type Notice,
 } from "../lib/dashboard";
 import type { DHBWAccount } from "../lib/dhbw";
-import { averageGrade, formatGrade, type Semester } from "../lib/grades";
+import { formatGrade, type Semester } from "../lib/grades";
 import { listLights } from "../lib/light.server";
 import type { MailFolder } from "../lib/mail";
 import { courseName } from "../lib/moodle";
@@ -102,7 +102,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const inbox = folders?.find((folder) => folder.role === "inbox") ?? folders?.find((folder) => folder.id === "inbox");
 
   const semesters = (await json<{ semesters?: Semester[] }>(gradesRes, {})).semesters ?? [];
-  const modules = semesters.flatMap((semester) => semester.modules);
   const cookie = request.headers.get("Cookie");
   const dualis = gradeNotices(semesters);
   const dualisSeen = readSeen(cookie);
@@ -138,11 +137,6 @@ export async function loader({ request }: Route.LoaderArgs) {
       connected: account?.mail === true,
       unread: folders === null ? null : (inbox?.unread ?? 0),
     },
-    average: {
-      connected: account?.dualis === true,
-      value: averageGrade(modules),
-      count: modules.filter((module) => module.grade !== null).length,
-    },
     notices: {
       items,
       grades: { keys: dualis.map((notice) => notice.key), baseline: dualisSeen === null },
@@ -153,7 +147,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { agenda, calendarFailed, average, mail, notices, lights } = loaderData;
+  const { agenda, calendarFailed, mail, notices, lights } = loaderData;
   const revalidator = useRevalidator();
   const now = useTicker(loaderData.now, minuteMs);
   const plan = useMemo(() => planDay(agenda, now), [agenda, now]);
@@ -176,7 +170,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         now={now}
         plan={plan}
         calendarFailed={calendarFailed}
-        average={average}
         mail={mail}
         notices={notices}
         lights={lights}

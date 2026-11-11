@@ -5,18 +5,15 @@ import { buttonClass, primaryButtonClass } from "../setting-row";
 import { Toast } from "../toast";
 import { accentVars } from "../../lib/nav";
 import {
-  gradeColor,
   gradesSeenCookie,
   moodleSeenCookie,
   writeSeen,
   type Notice,
   type SeenSource,
 } from "../../lib/dashboard";
-import { formatAverage } from "../../lib/grades";
 import { lightsApi, type Light, type LightState } from "../../lib/light";
 
 export type MailSummary = { connected: boolean; unread: number | null };
-export type AverageSummary = { connected: boolean; value: number | null; count: number };
 export type NoticeSummary = { items: Notice[]; grades: SeenSource; moodle: SeenSource };
 
 const frameClass = "flex min-h-32 w-full min-w-0 flex-col gap-3 rounded-xl border border-ui-border bg-ui-raised p-4 text-left";
@@ -33,56 +30,35 @@ function Heading({ children, aside }: { children: ReactNode; aside?: ReactNode }
   );
 }
 
-export function AverageTile({ average }: { average: AverageSummary }) {
-  const value = average.value;
-
-  return (
-    <Link
-      to={average.connected ? "/grades" : "/settings/connections"}
-      className={`${frameClass} ${linkClass}`}
-      title={average.connected ? `${average.count} graded modules` : "Dualis not connected"}
-    >
-      <Heading>Grades</Heading>
-      <span
-        style={accentVars(gradeColor(value))}
-        className={`text-5xl font-semibold tabular-nums ${value === null ? "text-ui-fg-faint" : "text-[var(--accent-fg)]"}`}
-      >
-        {value === null ? "–" : formatAverage(value)}
-      </span>
-    </Link>
-  );
+export function hasUnread(mail: MailSummary) {
+  return mail.connected && (mail.unread ?? 0) > 0;
 }
 
 export function MailTile({ mail }: { mail: MailSummary }) {
   const unread = mail.unread ?? 0;
-  const known = mail.connected && mail.unread !== null;
 
   return (
-    <Link to={mail.connected ? "/mail" : "/settings/connections"} className={`${frameClass} ${linkClass}`}>
+    <Link to="/mail" className={`${frameClass} ${linkClass}`}>
       <Heading>Mail</Heading>
-      {known ? (
-        <span className="flex items-baseline gap-2">
-          <span className={`text-5xl font-semibold tabular-nums ${unread > 0 ? "text-ctp-teal" : "text-ui-fg"}`}>
-            {unread}
-          </span>
-          <span className="text-base text-ui-fg-muted">unread mail{unread === 1 ? "" : "s"}</span>
-        </span>
-      ) : (
-        <span className="text-base text-ui-fg-faint">{mail.connected ? "Not reachable" : "Not connected"}</span>
-      )}
+      <span className="flex items-baseline gap-2">
+        <span className="text-5xl font-semibold text-ctp-teal tabular-nums">{unread}</span>
+        <span className="text-base text-ui-fg-muted">{unread === 1 ? "unread mail" : "unread mails"}</span>
+      </span>
     </Link>
   );
 }
 
 const shownNotices = 3;
 
-export function NoticesTile({ notices }: { notices: NoticeSummary }) {
-  const [cleared, setCleared] = useState(false);
-
+export function useSeenBaseline(notices: NoticeSummary) {
   useEffect(() => {
     if (notices.grades.baseline && notices.grades.keys.length > 0) writeSeen(notices.grades.keys, gradesSeenCookie);
     if (notices.moodle.baseline && notices.moodle.keys.length > 0) writeSeen(notices.moodle.keys, moodleSeenCookie);
   }, [notices.grades.keys.join("."), notices.moodle.keys.join(".")]);
+}
+
+export function NoticesTile({ notices }: { notices: NoticeSummary }) {
+  const [cleared, setCleared] = useState(false);
 
   function markSeen(source?: Notice["source"]) {
     if (!source || source === "grades") writeSeen(notices.grades.keys, gradesSeenCookie);
@@ -90,56 +66,53 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
   }
 
   const items = cleared ? [] : notices.items;
+  if (items.length === 0) return null;
 
   return (
     <div className={frameClass}>
       <Heading
         aside={
-          items.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                markSeen();
-                setCleared(true);
-              }}
-              aria-label="Clear notifications"
-              title="Clear"
-              className="grid size-6 cursor-pointer place-items-center rounded text-ui-fg-faint outline-none hover:bg-ui-hover hover:text-ui-fg focus-visible:ring-2 focus-visible:ring-ui-ring"
-            >
-              <Icon name="close" className="size-3.5" />
-            </button>
-          )
+          <button
+            type="button"
+            onClick={() => {
+              markSeen();
+              setCleared(true);
+            }}
+            aria-label="Clear notifications"
+            title="Clear"
+            className="grid size-6 cursor-pointer place-items-center rounded text-ui-fg-faint outline-none hover:bg-ui-hover hover:text-ui-fg focus-visible:ring-2 focus-visible:ring-ui-ring"
+          >
+            <Icon name="close" className="size-3.5" />
+          </button>
         }
       >
         Notifications
       </Heading>
-      {items.length > 0 && (
-        <ul className="-mx-2 flex flex-col">
-          {items.slice(0, shownNotices).map((notice) => (
-            <li key={notice.key}>
-              <Link
-                to={notice.href}
-                onClick={() => markSeen(notice.source)}
-                className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${linkClass}`}
+      <ul className="-mx-2 flex flex-col">
+        {items.slice(0, shownNotices).map((notice) => (
+          <li key={notice.key}>
+            <Link
+              to={notice.href}
+              onClick={() => markSeen(notice.source)}
+              className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${linkClass}`}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ui-fg">{notice.title}</span>
+                <span className="block truncate text-xs text-ui-fg-muted">{notice.detail}</span>
+              </span>
+              <span
+                style={accentVars(notice.color)}
+                className="shrink-0 rounded-md bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] px-2 py-0.5 text-sm font-bold text-[var(--accent-fg)] tabular-nums"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ui-fg">{notice.title}</span>
-                  <span className="block truncate text-xs text-ui-fg-muted">{notice.detail}</span>
-                </span>
-                <span
-                  style={accentVars(notice.color)}
-                  className="shrink-0 rounded-md bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] px-2 py-0.5 text-sm font-bold text-[var(--accent-fg)] tabular-nums"
-                >
-                  {notice.value}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {items.length > shownNotices && (
-            <li className="px-2 pt-1 text-xs text-ui-fg-faint">+{items.length - shownNotices}</li>
-          )}
-        </ul>
-      )}
+                {notice.value}
+              </span>
+            </Link>
+          </li>
+        ))}
+        {items.length > shownNotices && (
+          <li className="px-2 pt-1 text-xs text-ui-fg-faint">+{items.length - shownNotices}</li>
+        )}
+      </ul>
     </div>
   );
 }
