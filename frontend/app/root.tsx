@@ -8,9 +8,12 @@ import {
   useRouteLoaderData,
 } from "react-router";
 
+import { useEffect, useState } from "react";
 import type { Route } from "./+types/root";
 import { Page } from "./components/page";
 import { Block } from "./components/block";
+import { buttonClass } from "./components/setting-row";
+import { isStaleBuildError, reloadOnce } from "./lib/stale-build";
 import { readTheme } from "./lib/theme";
 import "./app.css";
 
@@ -59,6 +62,23 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const stale = isStaleBuildError(error);
+  const [reloading, setReloading] = useState(stale);
+
+  useEffect(() => {
+    if (stale) setReloading(reloadOnce());
+  }, [stale]);
+
+  if (stale && reloading) {
+    return (
+      <Page title="Updating" color="mauve">
+        <Block>
+          <p className="text-ui-fg-muted">A new version is available. Reloading…</p>
+        </Block>
+      </Page>
+    );
+  }
+
   let message = "Oops!";
   let details = "An unexpected error occurred.";
   let stack: string | undefined;
@@ -69,6 +89,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       error.status === 404
         ? "The requested page could not be found."
         : error.statusText || details;
+  } else if (stale) {
+    message = "Update";
+    details = "A new version is available. Reload the page.";
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
@@ -78,6 +101,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <Page title={message} color="red">
       <Block>
         <p className="text-ui-fg-muted">{details}</p>
+        {stale && (
+          <button type="button" onClick={() => window.location.reload()} className={`${buttonClass} mt-4`}>
+            Reload
+          </button>
+        )}
         {stack && (
           <pre className="mt-4 w-full overflow-x-auto rounded-md bg-ui-field p-4 text-sm">
             <code>{stack}</code>
