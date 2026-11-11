@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { Icon } from "../../components/icons";
-import {
-  SettingsPanel,
-  SettingsSection,
-} from "../../components/settings-section";
+import { Block, Stack } from "../../components/block";
 import { applyTheme, type Theme } from "../../lib/theme";
 
 const themes: { value: Theme; label: string; flavour: string }[] = [
@@ -47,8 +44,8 @@ export default function AppearanceSettings() {
   }
 
   return (
-    <SettingsPanel>
-      <SettingsSection title="Color theme">
+    <Stack>
+      <Block title="Color theme">
         <div className="flex flex-wrap gap-3">
           {themes.map((theme) => {
             const active = current === theme.value;
@@ -81,7 +78,7 @@ export default function AppearanceSettings() {
             );
           })}
         </div>
-      </SettingsSection>
-    </SettingsPanel>
+      </Block>
+    </Stack>
   );
 }

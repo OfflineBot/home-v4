@@ -15,7 +15,7 @@ root.tsx                   h-screen, bg-ctp-crust — the frame
     └── <Page>             card filling the rest, bg-ctp-mantle
         ├── header         h-12, colored icon + title, border-b
         └── body           scrolls — a domain writes only this
-            └── <Panel>    module card, bg-ctp-base
+            └── <Block>    module card, bg-ctp-base
 ```
 
 Tone follows elevation: the further forward something is, the lighter it gets.
@@ -29,7 +29,7 @@ contrast in both:
 | --- | --- | --- | --- |
 | `ui-frame` | crust | crust | shell + sidebar |
 | `ui-surface` | mantle | mantle | content card |
-| `ui-raised` | base | base | panels, menu popup |
+| `ui-raised` | base | base | block bodies, menu popup |
 | `ui-field` | mantle | mantle | inputs |
 | `ui-border` | surface1 | surface2 | card + panel borders |
 | `ui-hover` | surface0 | surface0 | row hover |
@@ -79,7 +79,8 @@ Everything is a multiple of 4px. Only these values are used:
 | token | value | used for |
 | --- | --- | --- |
 | `h-12` | 48px | sidebar toggle, page header |
-| `h-9` | 36px | nav rows, account row, menu items |
+| `h-9` | 36px | nav rows (both navs), account row, menu items |
+| `h-10` | 40px | block header |
 | `size-5` | 20px | icon slot, both states |
 | `size-4` | 16px | every icon |
 | `p-3` | 12px | shell gap, sidebar vertical padding |
@@ -139,13 +140,16 @@ Everything that changes is fixed-to-fixed and interpolates cleanly: sidebar
 `Page` sets `--accent` from `color`, so anything in the body can use
 `text-[var(--accent)]` or `bg-[var(--accent)]` without knowing which color it is.
 
-### `<Panel>`
+### `<Block>`
 
-A content module. Use one per logical block instead of styling raw divs — that
-is what makes the grid read as modular.
+The one module shape in the app — header on `ui-surface` with an optional
+`<Badge>`, body on `ui-raised`. One block per subtopic, stacked with `<Stack>`;
+never style a raw div as a card.
 
 ```tsx
-<Panel title="Status">...</Panel>
+<Stack>
+  <Block title="Two factor" status={<Badge tone="good">On</Badge>}>...</Block>
+</Stack>
 ```
 
 ## Theme
@@ -206,17 +210,29 @@ relative (`"profile"`), never absolute. `prefix("")` produces absolute paths and
 React Router rejects the config with *"An absolute child route path must start
 with the combined path of all its parent routes"*.
 
-Layout is two blocks side by side, both in the same card style as `<Panel>`:
+Layout is two blocks side by side, both in the same card style as `<Block>`:
 the nav on the left, the content on the right. The nav uses `self-start` so it
 hugs its items instead of stretching to full height — otherwise "Delete account"
 floats at the bottom edge and stops reading as part of the block.
 
-Inside the content block: `<SettingsPanel>` is the card, `<SettingsSection>` is
-a titled region separated by a rule, `<SettingRow>` is one line — label and hint
-left, control right. A page never nests a card in a card, and a row costs one
-line of height, which is what keeps a long settings list readable.
+Inside the content area: **one `<Block>` per subtopic**, stacked by `<Stack>`.
+Security is therefore two blocks — Password and Two factor — not two regions in
+one card. Separate blocks make the grouping visible without a caption saying so.
+
+A block is a header on `ui-surface` (one tone darker) plus a body on
+`ui-raised`. That is the same header/body shape as the page card itself, so the
+whole app reads as one system. `<Badge>` carries status in the header
+(`Administrator`, `On`/`Off`, `Online`), which replaces a sentence of prose.
+
+This is the **only** module shape — there is no second card component. Home and
+the domain pages use the same `<Block>`.
 
 ### Where controls go
+
+**No prose that explains the obvious.** A field called "Current password" needs
+no sentence under it, and nobody has to be told what two factor is. Status goes
+in a `<Badge>`, not in a paragraph. If a heading would only repeat the nav entry
+("Profile" under *Profile*), leave it out.
 
 **An action sits below what it acts on, not to its right.** `<SettingRow>`
 stacks label, hint, inputs and then the button, all left aligned. A control

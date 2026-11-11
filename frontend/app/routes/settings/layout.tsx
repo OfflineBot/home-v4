@@ -20,7 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 const row =
-  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ui-ring";
+  "flex h-9 items-center gap-2.5 rounded-md px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ui-ring";
 
 export default function SettingsLayout() {
   return (

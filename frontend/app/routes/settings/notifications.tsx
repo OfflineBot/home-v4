@@ -1,19 +1,15 @@
 import { Icon } from "../../components/icons";
-import {
-  Placeholder,
-  SettingsPanel,
-  SettingsSection,
-} from "../../components/settings-section";
+import { Block, Placeholder, Stack } from "../../components/block";
 
 export default function NotificationsSettings() {
   return (
-    <SettingsPanel>
-      <SettingsSection>
+    <Stack>
+      <Block>
         <Placeholder
           icon={<Icon name="notifications" className="size-5" />}
           hint="No channels."
         />
-      </SettingsSection>
-    </SettingsPanel>
+      </Block>
+    </Stack>
   );
 }

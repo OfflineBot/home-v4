@@ -10,7 +10,7 @@ import {
 
 import type { Route } from "./+types/root";
 import { Page } from "./components/page";
-import { Panel } from "./components/panel";
+import { Block } from "./components/block";
 import { readTheme } from "./lib/theme";
 import "./app.css";
 
@@ -76,14 +76,14 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <Page title={message} color="red">
-      <Panel>
+      <Block>
         <p className="text-ui-fg-muted">{details}</p>
         {stack && (
           <pre className="mt-4 w-full overflow-x-auto rounded-md bg-ui-field p-4 text-sm">
             <code>{stack}</code>
           </pre>
         )}
-      </Panel>
+      </Block>
     </Page>
   );
 }

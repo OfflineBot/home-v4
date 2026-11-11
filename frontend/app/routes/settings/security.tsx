@@ -8,11 +8,7 @@ import {
   inputClass,
   primaryButtonClass,
 } from "../../components/setting-row";
-import {
-  Badge,
-  SettingsPanel,
-  SettingsSection,
-} from "../../components/settings-section";
+import { Badge, Block, Stack } from "../../components/block";
 import { Toast } from "../../components/toast";
 import { api, unreachableStatus } from "../../lib/api";
 import { hashPassword, minPasswordLength } from "../../lib/password";
@@ -144,8 +140,8 @@ export default function SecuritySettings({ actionData }: Route.ComponentProps) {
 
   return (
     <>
-      <SettingsPanel>
-        <SettingsSection title="Password">
+      <Stack>
+        <Block title="Password">
           <form onSubmit={changePassword} className={fieldStackClass}>
             <input
               type="password"
@@ -172,9 +168,9 @@ export default function SecuritySettings({ actionData }: Route.ComponentProps) {
               Update
             </button>
           </form>
-        </SettingsSection>
+        </Block>
 
-        <SettingsSection
+        <Block
           title="Two factor"
           status={enabled ? <Badge tone="good">On</Badge> : <Badge>Off</Badge>}
         >
@@ -277,8 +273,8 @@ export default function SecuritySettings({ actionData }: Route.ComponentProps) {
               </form>
             </div>
           )}
-        </SettingsSection>
-      </SettingsPanel>
+        </Block>
+      </Stack>
 
       <Toast key={attempt} message={error ?? null} />
     </>

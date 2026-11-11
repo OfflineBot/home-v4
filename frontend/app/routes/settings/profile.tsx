@@ -1,14 +1,6 @@
 import { useRouteLoaderData } from "react-router";
-import {
-  buttonClass,
-  fieldStackClass,
-  inputClass,
-} from "../../components/setting-row";
-import {
-  Badge,
-  SettingsPanel,
-  SettingsSection,
-} from "../../components/settings-section";
+import { buttonClass, inputClass } from "../../components/setting-row";
+import { Badge, Block, Stack } from "../../components/block";
 
 export default function ProfileSettings() {
   const data = useRouteLoaderData("routes/settings/layout") as
@@ -16,14 +8,14 @@ export default function ProfileSettings() {
   const me = data?.me;
 
   return (
-    <SettingsPanel>
-      <SettingsSection
+    <Stack>
+      <Block
         title="Display name"
         status={
           me?.is_admin ? <Badge tone="accent">Administrator</Badge> : null
         }
       >
-        <div className={fieldStackClass}>
+        <div className="flex max-w-sm flex-col gap-2">
           <input
             defaultValue={me?.name ?? ""}
             className={inputClass}
@@ -37,7 +29,7 @@ export default function ProfileSettings() {
             Save
           </button>
         </div>
-      </SettingsSection>
-    </SettingsPanel>
+      </Block>
+    </Stack>
   );
 }

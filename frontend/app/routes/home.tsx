@@ -1,6 +1,6 @@
 import type { Route } from "./+types/home";
 import { Page } from "../components/page";
-import { Panel } from "../components/panel";
+import { Badge, Block, Stack } from "../components/block";
 import { api } from "../lib/api";
 
 export function meta() {
@@ -21,16 +21,24 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   return (
     <Page title="home-v4" icon="home">
-      <Panel title="Backend">
-        <p className="flex items-center gap-2 text-ui-fg-muted">
-          <span
-            className={`size-2.5 rounded-full ${
-              online ? "bg-ctp-green" : "bg-ctp-red"
-            }`}
-          />
-          {online ? "reachable" : "unreachable"}
-        </p>
-      </Panel>
+      <Stack>
+        <Block
+          title="Backend"
+          status={
+            online ? (
+              <Badge tone="good">Online</Badge>
+            ) : (
+              <Badge tone="bad">Offline</Badge>
+            )
+          }
+        >
+          <p className="text-sm text-ui-fg-muted">
+            {online
+              ? "Responding on /api/health."
+              : "No response on /api/health."}
+          </p>
+        </Block>
+      </Stack>
     </Page>
   );
 }
