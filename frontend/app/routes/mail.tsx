@@ -4,11 +4,12 @@ import type { Route } from "./+types/mail";
 import { EmptySync } from "../components/empty-sync";
 import { Icon } from "../components/icons";
 import { ComposePane } from "../components/mail/compose";
+import { ExportDialog } from "../components/mail/export-dialog";
 import { FolderList } from "../components/mail/folder-list";
 import { MessageList } from "../components/mail/message-list";
 import { Reader } from "../components/mail/reader";
 import { Page } from "../components/page";
-import { primaryButtonClass } from "../components/setting-row";
+import { buttonClass, primaryButtonClass } from "../components/setting-row";
 import { SyncButton } from "../components/sync-button";
 import { api } from "../lib/api";
 import { isConnected } from "../lib/connections.server";
@@ -86,6 +87,7 @@ export default function Mail({ loaderData }: Route.ComponentProps) {
     loaderData;
   const navigation = useNavigation();
   const [draft, setDraft] = useState<ComposeDraft | null>(null);
+  const [exporting, setExporting] = useState(false);
   const loading =
     navigation.state === "loading" && navigation.location.pathname === "/mail";
   const selected = detail?.id ?? null;
@@ -99,6 +101,17 @@ export default function Mail({ loaderData }: Route.ComponentProps) {
       actions={
         <>
           <SyncButton job="mail" state={sync} />
+          {folders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExporting(true)}
+              title="Export mails"
+              className={`${buttonClass} inline-flex items-center gap-1.5`}
+            >
+              <Icon name="download" className="size-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          )}
           {connected && (
             <button
               type="button"
@@ -150,6 +163,7 @@ export default function Mail({ loaderData }: Route.ComponentProps) {
           )}
         </div>
       )}
+      <ExportDialog open={exporting} folders={folders} onClose={() => setExporting(false)} />
     </Page>
   );
 }

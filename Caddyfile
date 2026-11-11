@@ -1,6 +1,13 @@
-{$SITE_ADDRESS} {
-	tls internal
+{
+	servers :8080 {
+		trusted_proxies static private_ranges
+	}
+	servers :8081 {
+		trusted_proxies static private_ranges
+	}
+}
 
+(app) {
 	handle /api/machine/terminals/connect {
 		reverse_proxy backend:8080
 	}
@@ -16,9 +23,25 @@
 	}
 }
 
-{$PAGES_ADDRESS:pages.localhost} {
-	tls internal
-
+(pages) {
 	encode zstd gzip
 	reverse_proxy backend:8080
+}
+
+{$SITE_ADDRESS} {
+	tls internal
+	import app
+}
+
+{$PAGES_ADDRESS:pages.localhost} {
+	tls internal
+	import pages
+}
+
+http://:8080 {
+	import app
+}
+
+http://:8081 {
+	import pages
 }

@@ -1,14 +1,17 @@
 package domainpage
 
 import (
+	"bufio"
 	"errors"
+	"log/slog"
+	"mime"
 	"strconv"
+	"strings"
 	"time"
 
 	"home-v4/backend/services/auth"
-	"home-v4/backend/services/domain_page/mail"
-
 	"home-v4/backend/services/connections"
+	"home-v4/backend/services/domain_page/mail"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
@@ -23,7 +26,13 @@ func MailRouter(r fiber.Router) {
 		Get("/messages/:id", mailMessage).
 		Get("/attachments/:id", mailAttachment).
 		Get("/contacts", mailContacts).
-		Get("/contacts/directory", directoryLimit(), mailDirectory)
+		Get("/contacts/directory", directoryLimit(), mailDirectory).
+		Get("/export", mailExport)
+}
+
+var exportTypes = map[string]string{
+	mail.FormatJSON:  "application/json; charset=utf-8",
+	mail.FormatJSONL: "application/x-ndjson; charset=utf-8",
 }
 
 const (
@@ -140,4 +149,37 @@ func mailDirectory(c fiber.Ctx) error {
 	default:
 		return mailResult(err)
 	}
+}
+
+func mailExport(c fiber.Ctx) error {
+	opts := mail.ExportOptions{
+		Format: strings.ToLower(c.Query("format", mail.FormatJSON)),
+		HTML:   fiber.Query[bool](c, "html"),
+	}
+	for _, folder := range strings.Split(c.Query("folders"), ",") {
+		if folder = strings.TrimSpace(folder); folder != "" {
+			opts.Folders = append(opts.Folders, folder)
+		}
+	}
+	if err := mail.ValidateExport(opts); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid_export"})
+	}
+
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
+
+	disposition := "attachment"
+	if header := mime.FormatMediaType(disposition, map[string]string{"filename": mail.ExportFilename(opts.Format)}); header != "" {
+		disposition = header
+	}
+	c.Set(fiber.HeaderContentType, exportTypes[opts.Format])
+	c.Set(fiber.HeaderContentDisposition, disposition)
+	c.Set(fiber.HeaderCacheControl, "no-store")
+
+	return c.SendStreamWriter(func(w *bufio.Writer) {
+		if err := mail.Export(user.ID, opts, w); err != nil {
+			slog.Warn("mail: export failed", "err", err)
+			return
+		}
+		w.Flush()
+	})
 }

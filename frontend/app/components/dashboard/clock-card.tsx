@@ -66,7 +66,7 @@ export function ClockCard({ now, plan, calendarFailed, average, mail, notices, l
   return (
     <div style={accentVars(period.colors[0])} className="flex flex-col gap-8 p-2 sm:p-6">
       <div className={`grid items-end gap-6 lg:gap-8 ${focus ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
-        <Link to={dayHref(focus?.isToday === false ? focus.day : "")} className={`-m-3 min-w-0 p-3 ${pressable}`}>
+        <Link to={dayHref("")} className={`-m-3 min-w-0 p-3 ${pressable}`}>
           <span className="block text-lg font-semibold text-[var(--accent-fg)]">{weekdayName(now)}</span>
           <span className="block text-sm text-ui-fg-muted">{fullDate(now)}</span>
           <span
@@ -120,7 +120,7 @@ function Glance({ plan, now, focusLabel, href }: { plan: DayPlan; now: number; f
     <EventBox item={item} label={focusLabel ?? "Next"} href={href}>
       <span className="flex items-baseline gap-3">
         <span className="text-2xl font-semibold text-ui-fg tabular-nums">{clockTime(item.start)}</span>
-        <span className="text-sm font-semibold text-[var(--accent-fg)]">{until(item.start, now)}</span>
+        {!focusLabel && <span className="text-sm font-semibold text-[var(--accent-fg)]">{until(item.start, now)}</span>}
         {item.room && <span className="ml-auto truncate text-xs text-ui-fg-muted">{item.room}</span>}
       </span>
     </EventBox>

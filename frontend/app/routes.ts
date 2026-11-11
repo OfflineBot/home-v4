@@ -20,6 +20,7 @@ export default [
   route("automation/api", "routes/automation.api.ts"),
   route("automation/icons/*", "routes/automation.icons.ts"),
   route("mail/contacts", "routes/mail.contacts.ts"),
+  route("mail/export", "routes/mail.export.ts"),
   route("machine/status/:id", "routes/machine.status.ts"),
   route("machine/terminal/:id", "routes/machine.terminal.ts"),
   route("lights/api", "routes/lights.api.ts"),
