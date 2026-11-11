@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Dialog } from "../dialog";
 import { Icon } from "../icons";
-import { buttonClass } from "../setting-row";
+import { buttonClass, dangerButtonClass } from "../setting-row";
 import { Toast } from "../toast";
 import { HostKeyChangedDialog, HostKeyDialog } from "./hostkey-dialog";
 import { PromptDialog } from "./prompt-dialog";
@@ -110,6 +111,7 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
   const root = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
+  const [closing, setClosing] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
@@ -226,6 +228,12 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
     });
   }
 
+  function askClose(id: string) {
+    const tab = tabs.find((entry) => entry.id === id);
+    if (!tab || tab.status.phase === "closed") close(id);
+    else setClosing(id);
+  }
+
   function close(id: string) {
     dropAsks(id);
     const index = tabs.findIndex((tab) => tab.id === id);
@@ -318,6 +326,7 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
   }
 
   const openNames = tabs.map((tab) => tab.session);
+  const closingTab = tabs.find((tab) => tab.id === closing) ?? null;
   const hostKeyAsk = hostKeys[0] ?? null;
   const promptAsk = hostKeyAsk ? null : (prompts[0] ?? null);
 
@@ -331,7 +340,7 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
               tab={tab}
               active={tab.id === active}
               onSelect={() => select(tab.id)}
-              onClose={() => close(tab.id)}
+              onClose={() => askClose(tab.id)}
             />
           ))}
         </div>
@@ -442,6 +451,29 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
         onForget={() => void forgetHostKey()}
         onClose={() => setChanged(null)}
       />
+      <Dialog open={closingTab !== null} title="Close this tab?" onClose={() => setClosing(null)}>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-ui-fg-muted">
+            <span className="font-mono text-ui-fg">{closingTab?.session}</span> keeps running on{" "}
+            {machine.name}. You can open it again later.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" autoFocus onClick={() => setClosing(null)} className={buttonClass}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (closingTab) close(closingTab.id);
+                setClosing(null);
+              }}
+              className={dangerButtonClass}
+            >
+              Close tab
+            </button>
+          </div>
+        </div>
+      </Dialog>
       <Toast key={failure.attempt} message={failure.attempt > 0 ? failure.message : null} />
     </div>
   );

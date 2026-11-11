@@ -5,8 +5,20 @@
 		reverse_proxy backend:8080
 	}
 
+	@git path_regexp ^/[^/]+/[^/]+\.git(/.*)?$
+	handle @git {
+		reverse_proxy backend:8080
+	}
+
 	handle {
 		encode zstd gzip
 		reverse_proxy frontend:3000
 	}
+}
+
+{$PAGES_ADDRESS:pages.localhost} {
+	tls internal
+
+	encode zstd gzip
+	reverse_proxy backend:8080
 }

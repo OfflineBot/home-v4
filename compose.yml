@@ -10,9 +10,14 @@ services:
       WOL_SOCKET: /run/wol/wol.sock
       N8N_URL: http://n8n:5678
       AUTOMATION_BACKEND_URL: http://backend:8080
+      STORAGE_DIR: /storage
+      GIT_REPOS_DIR: /repos
+      PAGES_BASE_URL: ${PAGES_BASE_URL:-http://pages.localhost:8080}
     volumes:
       - ./backend:/app
       - ./.data:/data
+      - ${STORAGE_PATH:-/data/home-v4/storage}:/storage
+      - ${GIT_PATH:-/data/home-v4/git}:/repos
       - wol-socket:/run/wol
     ports:
       - "8080:8080"

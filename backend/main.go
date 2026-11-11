@@ -21,12 +21,15 @@ func main() {
 		port = "8080"
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{StreamRequestBody: true})
 
 	err := services.Setup()
 	if err != nil {
 		panic("Setup failed with error: " + err.Error())
 	}
+
+	app.Use(routes.PagesHTTP)
+	app.Use(routes.GitHTTP)
 
 	api := app.Group("/api")
 	api.Get("/health", health)

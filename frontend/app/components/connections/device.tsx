@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Form } from "react-router";
 import { Icon } from "../icons";
 import { Badge } from "../block";
 import {
@@ -27,15 +26,9 @@ type DeviceListProps = {
   icon: string;
   removeIntent: string;
   devices: DeviceEntry[];
-  wired?: boolean;
 };
 
-export function DeviceList({
-  icon,
-  removeIntent,
-  devices,
-  wired = false,
-}: DeviceListProps) {
+export function DeviceList({ icon, removeIntent, devices }: DeviceListProps) {
   if (devices.length === 0) return null;
 
   return (
@@ -58,23 +51,7 @@ export function DeviceList({
             </span>
           </span>
 
-          {wired ? (
-            <RemoveDevice id={device.id} intent={removeIntent} />
-          ) : (
-            <Form method="post">
-              <input type="hidden" name="id" value={device.id} />
-              <button
-                //TODO: NOT WIRED!
-                type="submit"
-                name="intent"
-                value={removeIntent}
-                disabled
-                className={dangerButtonClass}
-              >
-                Remove
-              </button>
-            </Form>
-          )}
+          <RemoveDevice id={device.id} intent={removeIntent} />
         </li>
       ))}
     </ul>
@@ -113,50 +90,13 @@ function RemoveDevice({ id, intent }: { id: number; intent: string }) {
 type AddDeviceFormProps = {
   label: string;
   intent: string;
-  wired?: boolean;
   children: ReactNode;
 };
 
 const formClass =
   "mt-4 border-t border-ui-border-soft pt-4 first:mt-0 first:border-t-0 first:pt-0";
 
-export function AddDeviceForm({
-  label,
-  intent,
-  wired = false,
-  children,
-}: AddDeviceFormProps) {
-  if (wired) {
-    return (
-      <WiredAddForm label={label} intent={intent}>
-        {children}
-      </WiredAddForm>
-    );
-  }
-
-  return (
-    <Form method="post" className={formClass}>
-      <p className="text-sm font-medium text-ui-fg">{label}</p>
-      <div className={`${fieldGridClass} mt-3`}>{children}</div>
-      <button
-        //TODO: NOT WIRED!
-        type="submit"
-        name="intent"
-        value={intent}
-        disabled
-        className={`${primaryButtonClass} mt-3`}
-      >
-        {label}
-      </button>
-    </Form>
-  );
-}
-
-function WiredAddForm({
-  label,
-  intent,
-  children,
-}: Omit<AddDeviceFormProps, "wired">) {
+export function AddDeviceForm({ label, intent, children }: AddDeviceFormProps) {
   const { fetcher, busy, failed, toast } = useSubmission();
   const form = useRef<HTMLFormElement>(null);
 

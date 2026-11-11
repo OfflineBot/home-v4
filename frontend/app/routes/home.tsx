@@ -2,9 +2,6 @@ import { useEffect, useMemo } from "react";
 import { useRevalidator } from "react-router";
 import type { Route } from "./+types/home";
 import { ClockCard } from "../components/dashboard/clock-card";
-import { LightsBlock } from "../components/dashboard/lights-block";
-import { NotificationsBlock } from "../components/dashboard/notifications-block";
-import { TodayBlock } from "../components/dashboard/today-block";
 import { useTicker } from "../components/dashboard/use-ticker";
 import { Page } from "../components/page";
 import { api } from "../lib/api";
@@ -12,15 +9,21 @@ import { addDays, formatDay, todayIn } from "../lib/calendar";
 import type { CalendarCategory } from "../lib/calendar-events";
 import {
   agendaDays,
+  gradeColor,
   gradeNotices,
+  moodleKeys,
+  moodleSeenCookie,
   planDay,
   readSeen,
   type AgendaItem,
+  type MoodleCourseGrades,
+  type Notice,
 } from "../lib/dashboard";
 import type { DHBWAccount } from "../lib/dhbw";
-import type { Semester } from "../lib/grades";
+import { averageGrade, formatGrade, type Semester } from "../lib/grades";
 import { listLights } from "../lib/light.server";
 import type { MailFolder } from "../lib/mail";
+import { courseName } from "../lib/moodle";
 import { homeItem } from "../lib/nav";
 import { requireToken } from "../lib/session";
 
@@ -61,12 +64,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     marks: "normal,important",
   });
 
-  const [eventsRes, categoriesRes, accountRes, foldersRes, gradesRes, lights] = await Promise.all([
+  const [eventsRes, categoriesRes, accountRes, foldersRes, gradesRes, moodleRes, lights] = await Promise.all([
     api(`/api/calendar/events?${range}`, { headers }),
     api("/api/calendar/categories", { headers }),
     api("/api/connections/dhbw", { headers }),
     api("/api/mail/folders", { headers }),
     api("/api/grades/list", { headers }),
+    api("/api/moodle/grades", { headers }),
     listLights(token),
   ]);
 
@@ -98,8 +102,33 @@ export async function loader({ request }: Route.LoaderArgs) {
   const inbox = folders?.find((folder) => folder.role === "inbox") ?? folders?.find((folder) => folder.id === "inbox");
 
   const semesters = (await json<{ semesters?: Semester[] }>(gradesRes, {})).semesters ?? [];
-  const notices = gradeNotices(semesters);
-  const seen = readSeen(request.headers.get("Cookie"));
+  const modules = semesters.flatMap((semester) => semester.modules);
+  const cookie = request.headers.get("Cookie");
+  const dualis = gradeNotices(semesters);
+  const dualisSeen = readSeen(cookie);
+  const moodle = moodleKeys((await json<{ courses?: MoodleCourseGrades[] | null }>(moodleRes, {})).courses ?? []);
+  const moodleSeen = readSeen(cookie, moodleSeenCookie);
+
+  const items: Notice[] = [
+    ...(dualisSeen ? dualis.filter((notice) => !dualisSeen.has(notice.key)) : []).map((notice) => ({
+      key: notice.key,
+      source: "grades" as const,
+      title: notice.name,
+      detail: "Dualis",
+      value: notice.grade === null ? "✓" : formatGrade(notice.grade),
+      color: gradeColor(notice.grade),
+      href: "/grades",
+    })),
+    ...(moodleSeen ? moodle.filter((entry) => !moodleSeen.has(entry.key)) : []).map((entry) => ({
+      key: entry.key,
+      source: "moodle" as const,
+      title: entry.grade.name,
+      detail: courseName(entry.course.fullname),
+      value: entry.grade.formatted || "✓",
+      color: "sky",
+      href: `/moodle/${entry.course.id}`,
+    })),
+  ];
 
   return {
     now: Date.now(),
@@ -109,17 +138,22 @@ export async function loader({ request }: Route.LoaderArgs) {
       connected: account?.mail === true,
       unread: folders === null ? null : (inbox?.unread ?? 0),
     },
-    grades: {
-      fresh: seen ? notices.filter((notice) => !seen.has(notice.key)) : [],
-      keys: notices.map((notice) => notice.key),
-      baseline: seen === null,
+    average: {
+      connected: account?.dualis === true,
+      value: averageGrade(modules),
+      count: modules.filter((module) => module.grade !== null).length,
+    },
+    notices: {
+      items,
+      grades: { keys: dualis.map((notice) => notice.key), baseline: dualisSeen === null },
+      moodle: { keys: moodle.map((entry) => entry.key), baseline: moodleSeen === null },
     },
     lights,
   };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { agenda, calendarFailed, mail, grades, lights } = loaderData;
+  const { agenda, calendarFailed, average, mail, notices, lights } = loaderData;
   const revalidator = useRevalidator();
   const now = useTicker(loaderData.now, minuteMs);
   const plan = useMemo(() => planDay(agenda, now), [agenda, now]);
@@ -138,16 +172,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   return (
     <Page title={homeItem.label} icon="home" color={homeItem.color}>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,26rem)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <ClockCard initial={loaderData.now} now={now} plan={plan} calendarFailed={calendarFailed} />
-          <TodayBlock plan={plan} now={now} calendarFailed={calendarFailed} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
-          <NotificationsBlock mail={mail} grades={grades} />
-          <LightsBlock lights={lights} />
-        </div>
-      </div>
+      <ClockCard
+        now={now}
+        plan={plan}
+        calendarFailed={calendarFailed}
+        average={average}
+        mail={mail}
+        notices={notices}
+        lights={lights}
+      />
     </Page>
   );
 }

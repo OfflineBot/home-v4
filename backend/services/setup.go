@@ -8,11 +8,14 @@ import (
 	"home-v4/backend/services/db"
 	"home-v4/backend/services/domain_page/automation"
 	"home-v4/backend/services/domain_page/calendar"
+	"home-v4/backend/services/domain_page/files"
+	"home-v4/backend/services/domain_page/git"
 	"home-v4/backend/services/domain_page/grades"
 	"home-v4/backend/services/domain_page/lights"
 	"home-v4/backend/services/domain_page/machine"
 	"home-v4/backend/services/domain_page/mail"
 	"home-v4/backend/services/domain_page/moodle"
+	"home-v4/backend/services/domain_page/pages"
 	"home-v4/backend/services/storage"
 	"home-v4/backend/services/syncer"
 	"time"
@@ -28,6 +31,9 @@ func Setup() error {
 	db.AddSchema("syncer/schema.sql", syncer.Schema)
 	db.AddSchema("automation/schema.sql", automation.Schema)
 	db.AddSchema("lights/schema.sql", lights.Schema)
+	db.AddSchema("git/schema.sql", git.Schema)
+	db.AddSchema("files/schema.sql", files.Schema)
+	db.AddSchema("pages/schema.sql", pages.Schema)
 
 	if err := db.Setup(); err != nil {
 		return fmt.Errorf("Database setup failed with error: %w", err)
@@ -36,6 +42,16 @@ func Setup() error {
 	if err := storage.Setup(); err != nil {
 		return fmt.Errorf("Storage setup failed with error: %w", err)
 	}
+
+	if err := files.Setup(); err != nil {
+		return fmt.Errorf("Files setup failed with error: %w", err)
+	}
+	auth.OnDelete(files.ArchiveUser)
+
+	if err := git.Setup(); err != nil {
+		return fmt.Errorf("Git setup failed with error: %w", err)
+	}
+	auth.OnDelete(git.ArchiveUser)
 
 	if err := auth.Setup(); err != nil {
 		return fmt.Errorf("Auth setup failed with error: %w", err)

@@ -1,5 +1,6 @@
 FROM golang:1.27-alpine AS dev
 WORKDIR /app
+RUN apk add --no-cache git git-daemon
 RUN go install github.com/air-verse/air@latest
 COPY go.mod go.sum ./
 COPY libs/go.mod libs/go.sum ./libs/
@@ -29,5 +30,6 @@ CMD ["/wol"]
 
 FROM alpine:3.23 AS prod
 WORKDIR /app
+RUN apk add --no-cache git git-daemon
 COPY --from=build /server ./server
 CMD ["./server"]

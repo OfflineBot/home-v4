@@ -19,7 +19,6 @@ export function LightsConnection({ lights }: LightsConnectionProps) {
       <DeviceList
         icon="lights"
         removeIntent="delete-light"
-        wired
         devices={lights.map((light) => ({
           id: light.id,
           title: light.name,
@@ -27,7 +26,7 @@ export function LightsConnection({ lights }: LightsConnectionProps) {
         }))}
       />
 
-      <AddDeviceForm label="Add light" intent="add-light" wired>
+      <AddDeviceForm label="Add light" intent="add-light">
         <Field label="Name">
           <input
             name="name"

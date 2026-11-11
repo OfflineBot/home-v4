@@ -24,7 +24,6 @@ export function MachineConnection({ machines }: MachineConnectionProps) {
       <DeviceList
         icon="machine"
         removeIntent="delete-machine"
-        wired
         devices={machines.map((machine) => ({
           id: machine.id,
           title: machine.name,
@@ -32,7 +31,7 @@ export function MachineConnection({ machines }: MachineConnectionProps) {
         }))}
       />
 
-      <AddDeviceForm label="Add machine" intent="add-machine" wired>
+      <AddDeviceForm label="Add machine" intent="add-machine">
         <Field label="Name" className="sm:col-span-2">
           <input
             name="name"

@@ -20,15 +20,35 @@ export type GradeNotice = {
   key: string;
   name: string;
   graded: boolean;
+  grade: number | null;
 };
 
 export const gradesSeenCookie = "grades_seen";
+export const moodleSeenCookie = "moodle_seen";
+
+export type Notice = {
+  key: string;
+  source: "grades" | "moodle";
+  title: string;
+  detail: string;
+  value: string;
+  color: string;
+  href: string;
+};
+
+export type SeenSource = { keys: string[]; baseline: boolean };
+
+export type MoodleCourseGrades = {
+  id: number;
+  fullname: string;
+  grades?: { id: number; name: string; item_type: string; grade: number | null; formatted: string }[] | null;
+};
 export const agendaDays = 30;
 
 const minuteMs = 60_000;
 const hourMs = 60 * minuteMs;
 const cookieMaxAge = 60 * 60 * 24 * 365 * 2;
-const maxSeenKeys = 450;
+const maxSeenKeys = 300;
 
 export function localDay(ms: number) {
   return zonedStamp(new Date(ms)).slice(0, 10);
@@ -57,21 +77,12 @@ const dayShort = new Intl.DateTimeFormat("en-GB", {
   month: "short",
 });
 
-const secondsPart = new Intl.DateTimeFormat("en-GB", {
-  timeZone: calendarTimeZone,
-  second: "2-digit",
-});
-
 export function weekdayName(ms: number) {
   return weekdayLong.format(new Date(ms));
 }
 
 export function fullDate(ms: number) {
   return dateLong.format(new Date(ms));
-}
-
-export function seconds(ms: number) {
-  return secondsPart.format(new Date(ms)).padStart(2, "0");
 }
 
 function dayDistance(from: number, to: number) {
@@ -125,6 +136,7 @@ export type DayPlan = {
   next: AgendaItem | null;
   nextToday: AgendaItem | null;
   remainingToday: number;
+  focus: { day: string; items: AgendaItem[]; isToday: boolean } | null;
 };
 
 export function planDay(items: AgendaItem[], now: number): DayPlan {
@@ -138,7 +150,15 @@ export function planDay(items: AgendaItem[], now: number): DayPlan {
   const nextToday = next && localDay(next.start) === day ? next : null;
   const remainingToday = today.filter((item) => !item.cancelled && item.end > now).length;
 
-  return { today, current, next, nextToday, remainingToday };
+  let focus: DayPlan["focus"] = null;
+  if (remainingToday > 0) {
+    focus = { day, items: today, isToday: true };
+  } else if (next) {
+    const nextDay = localDay(next.start);
+    focus = { day: nextDay, items: items.filter((item) => localDay(item.start) === nextDay), isToday: false };
+  }
+
+  return { today, current, next, nextToday, remainingToday, focus };
 }
 
 function hash(text: string) {
@@ -158,17 +178,41 @@ export function gradeNotices(semesters: Semester[]): GradeNotice[] {
       key: hash(`${module.semester_id}:${module.module_id}:${module.grade ?? ""}:${module.status}`),
       name: module.name,
       graded: module.grade !== null,
+      grade: module.grade,
     }));
 }
 
-export function readSeen(cookieHeader: string | null) {
-  const match = cookieHeader?.match(new RegExp(`(?:^|;\\s*)${gradesSeenCookie}=([^;]*)`));
+export function readSeen(cookieHeader: string | null, name = gradesSeenCookie) {
+  const match = cookieHeader?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
   const keys = (match?.[1] ?? "").split(".").filter((key) => /^[0-9a-z]{1,8}$/.test(key));
   return keys.length > 0 ? new Set(keys) : null;
 }
 
-export function writeSeen(keys: string[]) {
+export function writeSeen(keys: string[], name = gradesSeenCookie) {
   const value = [...new Set(keys)].slice(-maxSeenKeys).join(".");
   if (value === "") return;
-  document.cookie = `${gradesSeenCookie}=${value}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
+  document.cookie = `${name}=${value}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
+}
+
+const aggregateItems = new Set(["course", "category"]);
+
+export function moodleKeys(courses: MoodleCourseGrades[]) {
+  return courses.flatMap((course) =>
+    (course.grades ?? [])
+      .filter((grade) => grade.grade !== null && !aggregateItems.has(grade.item_type))
+      .map((grade) => ({
+        key: hash(`m:${course.id}:${grade.id}:${grade.formatted}`),
+        course,
+        grade,
+      })),
+  );
+}
+
+export function gradeColor(grade: number | null) {
+  if (grade === null) return "overlay2";
+  if (grade <= 1.5) return "green";
+  if (grade <= 2.5) return "teal";
+  if (grade <= 3.5) return "yellow";
+  if (grade <= 4) return "peach";
+  return "red";
 }

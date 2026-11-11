@@ -10,8 +10,13 @@ services:
       WOL_SOCKET: /run/wol/wol.sock
       N8N_URL: http://n8n:5678
       AUTOMATION_BACKEND_URL: http://backend:8080
+      STORAGE_DIR: /storage
+      GIT_REPOS_DIR: /repos
+      PAGES_BASE_URL: ${PAGES_BASE_URL:-}
     volumes:
       - backend-data:/data
+      - ${STORAGE_PATH:-/data/home-v4/storage}:/storage
+      - ${GIT_PATH:-/data/home-v4/git}:/repos
       - wol-socket:/run/wol
     expose:
       - "8080"
@@ -86,6 +91,7 @@ services:
     image: caddy:2.10-alpine
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
+      PAGES_ADDRESS: ${PAGES_ADDRESS:-pages.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

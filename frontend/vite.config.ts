@@ -15,6 +15,9 @@ export default defineConfig({
         target: process.env.API_URL ?? "http://localhost:8080",
         ws: true,
       },
+      "^/[^/]+/[^/]+\\.git(/.*)?$": {
+        target: process.env.API_URL ?? "http://localhost:8080",
+      },
     },
   },
 });

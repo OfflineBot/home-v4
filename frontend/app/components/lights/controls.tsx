@@ -1,11 +1,15 @@
-import { useId, type CSSProperties } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import {
   solidEffect,
   swatches,
   type LightChange,
   type LightOption,
-  type LightPreset,
 } from "../../lib/light";
+
+export type PresetChoice = {
+  id: number;
+  name: string;
+};
 
 export type ControlValue = {
   on: boolean;
@@ -97,34 +101,37 @@ export function RangeField({
   );
 }
 
-type Mode = "color" | "animation";
+type Mode = "color" | "animation" | "preset";
 
 function ModeSwitch({
   mode,
   disabled,
   canAnimate,
+  canPreset,
   onChange,
 }: {
   mode: Mode;
   disabled?: boolean;
   canAnimate: boolean;
+  canPreset: boolean;
   onChange: (mode: Mode) => void;
 }) {
-  const options: { mode: Mode; label: string }[] = [
-    { mode: "color", label: "Color" },
-    { mode: "animation", label: "Animation" },
+  const options: { mode: Mode; label: string; available: boolean }[] = [
+    { mode: "color", label: "Color", available: true },
+    { mode: "animation", label: "Animation", available: canAnimate },
+    { mode: "preset", label: "Preset", available: canPreset },
   ];
 
   return (
     <div className="flex flex-col gap-2">
       <span className={labelClass}>Mode</span>
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-ui-border bg-ui-field p-1">
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-ui-border bg-ui-field p-1">
         {options.map((option) => (
           <button
             key={option.mode}
             type="button"
             aria-pressed={mode === option.mode}
-            disabled={disabled || (option.mode === "animation" && !canAnimate)}
+            disabled={disabled || !option.available}
             onClick={() => onChange(option.mode)}
             className={`h-8 cursor-pointer rounded-md text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ui-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${
               mode === option.mode
@@ -250,21 +257,36 @@ export function LightControls({
   value,
   effects,
   palettes,
+  presets = [],
+  preset = -1,
   disabled,
   onChange,
+  onPreset,
 }: {
   value: ControlValue;
   effects: LightOption[];
   palettes: LightOption[];
+  presets?: PresetChoice[];
+  preset?: number;
   disabled?: boolean;
   onChange: (change: LightChange) => void;
+  onPreset?: (preset: number) => void;
 }) {
-  const mode: Mode = value.effect === solidEffect ? "color" : "animation";
+  const [picking, setPicking] = useState(false);
+  const presetActive = presets.some((entry) => entry.id === preset);
+  const mode: Mode =
+    presetActive || picking ? "preset" : value.effect === solidEffect ? "color" : "animation";
   const animated = sorted(effects.filter((option) => option.id !== solidEffect));
   const schemes = sorted(palettes);
+  const canPreset = presets.length > 0 && onPreset !== undefined;
 
   function switchMode(next: Mode) {
     if (next === mode) return;
+    if (next === "preset") {
+      setPicking(true);
+      return;
+    }
+    setPicking(false);
     if (next === "color") {
       onChange({ color: value.color || fallbackColor });
       return;
@@ -289,11 +311,23 @@ export function LightControls({
           mode={mode}
           disabled={disabled}
           canAnimate={animated.length > 0}
+          canPreset={canPreset}
           onChange={switchMode}
         />
       </div>
 
-      {mode === "color" ? (
+      {mode === "preset" ? (
+        <OptionSelect
+          label="Preset"
+          value={preset}
+          options={presets}
+          disabled={disabled || !canPreset}
+          onChange={(id) => {
+            setPicking(false);
+            onPreset?.(id);
+          }}
+        />
+      ) : mode === "color" ? (
         <ColorPicker
           value={value.color || fallbackColor}
           disabled={disabled}
@@ -339,56 +373,6 @@ export function LightControls({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-export function PresetList({
-  presets,
-  active,
-  disabled,
-  onApply,
-}: {
-  presets: LightPreset[];
-  active: number;
-  disabled?: boolean;
-  onApply: (preset: number) => void;
-}) {
-  if (presets.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className={labelClass}>Presets</span>
-      <div className="flex flex-wrap gap-2">
-        {presets.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            aria-pressed={preset.id === active}
-            disabled={disabled}
-            onClick={() => onApply(preset.id)}
-            className={`flex h-8 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ui-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${
-              preset.id === active
-                ? "border-[var(--accent)] bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] text-[var(--accent-fg)]"
-                : "border-ui-border bg-ui-field text-ui-fg hover:bg-ui-hover"
-            }`}
-          >
-            {preset.colors.length > 0 && (
-              <span className="flex -space-x-1">
-                {preset.colors.slice(0, 3).map((color, index) => (
-                  <span
-                    key={`${color}-${index}`}
-                    className="size-3 rounded-full border border-black/20"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </span>
-            )}
-            {preset.quick_label && <span>{preset.quick_label}</span>}
-            <span>{preset.name || `Preset ${preset.id}`}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

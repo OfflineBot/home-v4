@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Badge, ExpandableBlock } from "../block";
 import { Icon } from "../icons";
+import { PreviewModal } from "../preview/preview-modal";
 import {
   fileKind,
   formatSize,
@@ -27,6 +29,9 @@ export function SectionBlock({
   const files = modules.flatMap(visibleFiles);
   const links = files.filter((file) => file.link).length;
   const summary = htmlToText(section.summary);
+  const previewable = files.filter((file) => !file.link);
+  const [preview, setPreview] = useState<MoodleFile | null>(null);
+  const index = preview ? previewable.findIndex((file) => file.id === preview.id) : -1;
 
   return (
     <ExpandableBlock
@@ -54,15 +59,35 @@ export function SectionBlock({
       ) : (
         <ul className="flex flex-col gap-2">
           {modules.map((module) => (
-            <ModuleItem key={module.id} module={module} />
+            <ModuleItem key={module.id} module={module} onPreview={setPreview} />
           ))}
         </ul>
       )}
+
+      <PreviewModal
+        source={
+          preview
+            ? { name: preview.filename, url: mediaHref("file", preview.id), mime: preview.mimetype, size: preview.filesize }
+            : null
+        }
+        downloadUrl={preview ? mediaHref("file", preview.id) : undefined}
+        detail={section.name || undefined}
+        position={index >= 0 ? { index, total: previewable.length } : undefined}
+        onPrevious={index > 0 ? () => setPreview(previewable[index - 1]) : undefined}
+        onNext={index >= 0 && index < previewable.length - 1 ? () => setPreview(previewable[index + 1]) : undefined}
+        onClose={() => setPreview(null)}
+      />
     </ExpandableBlock>
   );
 }
 
-function ModuleItem({ module }: { module: MoodleModule }) {
+function ModuleItem({
+  module,
+  onPreview,
+}: {
+  module: MoodleModule;
+  onPreview: (file: MoodleFile) => void;
+}) {
   const kind = moduleKind(module.modname);
   const files = visibleFiles(module);
   const description = htmlToText(module.description);
@@ -112,7 +137,7 @@ function ModuleItem({ module }: { module: MoodleModule }) {
         <ul className="divide-y divide-ui-border-soft border-t border-ui-border-soft">
           {files.map((file) => (
             <li key={file.id}>
-              <FileLink file={file} />
+              <FileLink file={file} onPreview={() => onPreview(file)} />
             </li>
           ))}
         </ul>
@@ -121,18 +146,13 @@ function ModuleItem({ module }: { module: MoodleModule }) {
   );
 }
 
-function FileLink({ file }: { file: MoodleFile }) {
-  const kind = fileKind(file);
-  const href = file.link ?? mediaHref("file", file.id);
+const rowClass =
+  "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-inset motion-reduce:transition-none";
 
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      style={accentVars(kind.color)}
-      className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring focus-visible:ring-inset motion-reduce:transition-none"
-    >
+function FileLink({ file, onPreview }: { file: MoodleFile; onPreview: () => void }) {
+  const kind = fileKind(file);
+  const label = (
+    <>
       <span className="w-11 shrink-0 rounded bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] py-0.5 text-center font-mono text-[10px] font-semibold text-[var(--accent-fg)]">
         {kind.label}
       </span>
@@ -142,13 +162,33 @@ function FileLink({ file }: { file: MoodleFile }) {
         ) : null}
         {file.filename}
       </span>
-      {file.link ? (
+    </>
+  );
+
+  if (file.link) {
+    return (
+      <a href={file.link} target="_blank" rel="noreferrer" style={accentVars(kind.color)} className={rowClass}>
+        {label}
         <Icon name="chevron" className="size-3.5 shrink-0 -rotate-45 text-ui-fg-muted" />
-      ) : (
-        <span className="shrink-0 text-xs text-ui-fg-muted tabular-nums">
-          {formatSize(file.filesize)}
-        </span>
-      )}
-    </a>
+      </a>
+    );
+  }
+
+  return (
+    <div style={accentVars(kind.color)} className="flex items-center">
+      <button type="button" onClick={onPreview} className={rowClass}>
+        {label}
+        <span className="shrink-0 text-xs text-ui-fg-muted tabular-nums">{formatSize(file.filesize)}</span>
+      </button>
+      <a
+        href={mediaHref("file", file.id)}
+        download={file.filename}
+        aria-label={`Download ${file.filename}`}
+        title="Download"
+        className="mr-2 grid size-8 shrink-0 place-items-center rounded-md text-ui-fg-muted outline-none hover:bg-ui-hover hover:text-ui-fg focus-visible:ring-2 focus-visible:ring-ui-ring"
+      >
+        <Icon name="download" className="size-4" />
+      </a>
+    </div>
   );
 }

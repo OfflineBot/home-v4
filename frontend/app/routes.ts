@@ -23,6 +23,9 @@ export default [
   route("machine/status/:id", "routes/machine.status.ts"),
   route("machine/terminal/:id", "routes/machine.terminal.ts"),
   route("lights/api", "routes/lights.api.ts"),
+  route("files/api", "routes/files.api.ts"),
+  route("git/api", "routes/git.api.ts"),
+  route("pages/api", "routes/pages.api.ts"),
 
   layout("layouts/app.tsx", [
     index("routes/home.tsx"),
@@ -46,6 +49,13 @@ export default [
     route("moodle/:id", "routes/moodle.course.tsx"),
     route("machine", "routes/machine.tsx"),
     route("lights", "routes/lights.tsx"),
+    route("files", "routes/files.tsx"),
+    route("files/archive", "routes/files.archive.tsx"),
+    route("git", "routes/git.tsx"),
+    route("git/tokens", "routes/git.tokens.tsx"),
+    route("git/:project/:repo", "routes/git.repo.tsx"),
+    route("git/:project/:repo/commit/:hash", "routes/git.commit.tsx"),
+    route("pages", "routes/pages.tsx"),
     route("automation", "routes/automation.tsx"),
     route("automation/:id", "routes/automation.workflow.tsx"),
     route(":page", "routes/domain.tsx"),

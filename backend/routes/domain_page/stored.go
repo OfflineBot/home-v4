@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,6 +43,10 @@ func sendStored(c fiber.Ctx, name, filename, contentType string) error {
 		return fiber.ErrNotFound
 	}
 
+	return sendFile(c, f, filename, contentType)
+}
+
+func sendFile(c fiber.Ctx, f *os.File, filename, contentType string) error {
 	info, err := f.Stat()
 	if err != nil {
 		f.Close()

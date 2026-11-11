@@ -148,3 +148,9 @@ func affectOne(result sql.Result, err error) error {
 
 	return nil
 }
+
+func UserNameByID(conn *sql.DB, userID int64) (string, error) {
+	var name string
+	err := conn.QueryRow("SELECT name FROM users WHERE id = ?", userID).Scan(&name)
+	return name, err
+}
