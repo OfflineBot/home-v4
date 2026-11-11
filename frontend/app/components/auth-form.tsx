@@ -5,7 +5,7 @@ import { CodeInput } from "./code-input";
 import { Toast } from "./toast";
 
 const field =
-  "h-9 w-full rounded-md border border-ui-border bg-ui-field px-3 text-ui-fg outline-none focus:border-ctp-mauve";
+  "h-9 w-full rounded-md border border-ui-border-strong bg-ui-field px-3 text-ui-fg outline-none focus:border-ctp-mauve";
 
 type AuthFormProps = {
   title: string;

@@ -15,8 +15,15 @@ export const navItems: NavItem[] = [
   { slug: "lights", label: "Lights", color: "pink" },
   { slug: "machine", label: "Machine", color: "red" },
   { slug: "mail", label: "Mail", color: "teal" },
+  { slug: "moodle", label: "Moodle", color: "sky" },
   { slug: "pages", label: "Pages", color: "lavender" },
 ];
+
+export const homeItem: NavItem = {
+  slug: "",
+  label: "Home",
+  color: "mauve",
+};
 
 export const settingsItem: NavItem = {
   slug: "settings",
@@ -24,7 +31,45 @@ export const settingsItem: NavItem = {
   color: "green",
 };
 
+export const adminItem: NavItem = {
+  slug: "admin",
+  label: "Admin",
+  color: "maroon",
+};
+
 export const allItems: NavItem[] = [...navItems, settingsItem];
+
+export function eventAccent(color: string, online = false) {
+  if (!online) return accentVars(color);
+
+  const shift = color === "teal" ? "lavender" : "teal";
+  const mixed = `color-mix(in oklab, var(--ctp-${color}) 50%, var(--ctp-${shift}))`;
+  return {
+    "--accent": mixed,
+    "--accent-fg": `color-mix(in oklab, ${mixed} var(--accent-mix), var(--ui-fg))`,
+  } as CSSProperties;
+}
+
+export function navColor(slug: string) {
+  return allItems.find((item) => item.slug === slug)?.color ?? "mauve";
+}
+
+export const accentColors = [
+  "rosewater",
+  "flamingo",
+  "pink",
+  "mauve",
+  "red",
+  "maroon",
+  "peach",
+  "yellow",
+  "green",
+  "teal",
+  "sky",
+  "sapphire",
+  "blue",
+  "lavender",
+];
 
 export function accent(item: NavItem) {
   return accentVars(item.color);

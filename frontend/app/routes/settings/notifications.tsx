@@ -1,6 +1,7 @@
 import { Icon } from "../../components/icons";
 import { Block, Placeholder, Stack } from "../../components/block";
 
+//TODO: NOT WIRED!
 export default function NotificationsSettings() {
   return (
     <Stack>

@@ -23,6 +23,7 @@ var schemaFiles = []string{
 	"lockout_schema.sql",
 	"settings_schema.sql",
 	"twofactor_schema.sql",
+	"dhbw_account_schema.sql",
 }
 
 var DB *sql.DB

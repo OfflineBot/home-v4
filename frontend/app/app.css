@@ -67,17 +67,18 @@
    each role points at a different tone per theme so contrast holds in both. */
 :root,
 [data-theme="dark"] {
-  --ui-frame: var(--ctp-crust);
-  --ui-surface: var(--ctp-mantle);
-  --ui-raised: var(--ctp-base);
+  --ui-frame: var(--ctp-mantle);
+  --ui-surface: var(--ctp-base);
+  --ui-raised: color-mix(in oklab, var(--ctp-base) 50%, var(--ctp-surface0));
   --ui-field: var(--ctp-mantle);
-  --ui-border: var(--ctp-surface1);
-  --ui-border-soft: var(--ctp-surface0);
-  --ui-hover: var(--ctp-surface0);
+  --ui-border: var(--ctp-surface2);
+  --ui-border-soft: var(--ctp-surface1);
+  --ui-border-strong: var(--ctp-overlay0);
+  --ui-hover: color-mix(in oklab, var(--ctp-surface0) 50%, var(--ctp-surface1));
   --ui-fg: var(--ctp-text);
-  --ui-fg-muted: var(--ctp-subtext0);
-  --ui-fg-faint: var(--ctp-overlay2);
-  --ui-ring: var(--ctp-overlay0);
+  --ui-fg-muted: var(--ctp-subtext1);
+  --ui-fg-faint: var(--ctp-subtext0);
+  --ui-ring: var(--ctp-overlay2);
   --ui-danger: var(--ctp-red);
   --accent-mix: 100%;
 }
@@ -90,6 +91,7 @@
   --ui-field: var(--ctp-mantle);
   --ui-border: var(--ctp-surface2);
   --ui-border-soft: var(--ctp-surface1);
+  --ui-border-strong: var(--ctp-overlay2);
   --ui-hover: var(--ctp-surface0);
   --ui-fg: var(--ctp-text);
   --ui-fg-muted: var(--ctp-subtext1);
@@ -97,6 +99,31 @@
   --ui-ring: var(--ctp-subtext0);
   --ui-danger: var(--ctp-red);
   --accent-mix: 30%;
+}
+
+@layer base {
+  [data-theme="dark"] {
+    font-weight: 450;
+  }
+}
+
+@theme {
+  --animate-fade-in: fade-in 300ms ease-out both;
+  --animate-dialog-in: dialog-in 200ms ease-out both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+      scale: 0.97;
+    }
+  }
 }
 
 /* inline keeps the var() reference in the utilities, so data-theme switches at runtime */
@@ -108,6 +135,7 @@
   --color-ui-field: var(--ui-field);
   --color-ui-border: var(--ui-border);
   --color-ui-border-soft: var(--ui-border-soft);
+  --color-ui-border-strong: var(--ui-border-strong);
   --color-ui-hover: var(--ui-hover);
   --color-ui-fg: var(--ui-fg);
   --color-ui-fg-muted: var(--ui-fg-muted);

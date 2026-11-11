@@ -1,15 +1,157 @@
-import { Icon } from "../../components/icons";
-import { Block, Placeholder, Stack } from "../../components/block";
+import type { Route } from "./+types/connections";
+import { Stack } from "../../components/block";
+import { DHBWConnection } from "../../components/connections/dhbw";
+import { LightsConnection } from "../../components/connections/lights";
+import { MachineConnection } from "../../components/connections/machine";
+import { api, unreachableStatus } from "../../lib/api";
+import {
+  dhbwError,
+  dhbwLabel,
+  isDHBWModule,
+  joinCourse,
+  timetableModule,
+  type DHBWAccount,
+  type DHBWResult,
+} from "../../lib/dhbw";
+import { createLight, deleteLight, listLights } from "../../lib/light.server";
+import {
+  createMachine,
+  deleteMachine,
+  listMachines,
+} from "../../lib/machine.server";
+import { requireToken } from "../../lib/session";
 
-export default function ConnectionsSettings() {
+const dhbwPath = "/api/connections/dhbw";
+const timetablePath = "/api/connections/timetable";
+const verifyTimeoutMs = 90000;
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const token = await requireToken(request);
+  const headers = { Authorization: `Bearer ${token}` };
+  const [dhbw, timetable, machines, lights] = await Promise.all([
+    api(dhbwPath, { headers }),
+    api(timetablePath, { headers }),
+    listMachines(token),
+    listLights(token),
+  ]);
+
+  return {
+    dhbw: dhbw.ok ? ((await dhbw.json()) as DHBWAccount) : null,
+    timetable: timetable.ok
+      ? (((await timetable.json()) as { course?: string | null }).course ??
+        null)
+      : null,
+    machines,
+    lights,
+  };
+}
+
+type DHBWTarget = {
+  path: string;
+  body?: Record<string, string>;
+  module: string;
+  success: string;
+};
+
+function dhbwTarget(form: FormData): DHBWTarget | null {
+  const intent = String(form.get("intent") ?? "");
+  const module = String(form.get("module") ?? "");
+
+  if (intent === "dhbw-name") {
+    return {
+      path: `${dhbwPath}/name`,
+      body: { name: String(form.get("name") ?? "") },
+      module,
+      success: "Username saved.",
+    };
+  }
+  if (intent === "timetable-set") {
+    const site = String(form.get("location") ?? "");
+    return {
+      path: timetablePath,
+      body: {
+        site,
+        course: joinCourse(site, String(form.get("course") ?? "")),
+      },
+      module: timetableModule,
+      success: "Course saved. The first sync is running.",
+    };
+  }
+  if (intent === "timetable-remove") {
+    return {
+      path: `${timetablePath}/delete`,
+      module: timetableModule,
+      success: "Course removed.",
+    };
+  }
+  if (!isDHBWModule(module)) return null;
+
+  if (intent === "dhbw-password") {
+    return {
+      path: `${dhbwPath}/${module}/password`,
+      body: { password: String(form.get("password") ?? "") },
+      module,
+      success: `${dhbwLabel(module)} login works. Password saved.`,
+    };
+  }
+  if (intent === "dhbw-remove") {
+    return {
+      path: `${dhbwPath}/${module}/password/delete`,
+      module,
+      success: `${dhbwLabel(module)} password removed.`,
+    };
+  }
+
+  return null;
+}
+
+export async function action({
+  request,
+}: Route.ActionArgs): Promise<DHBWResult> {
+  const token = await requireToken(request);
+  const form = await request.formData();
+  const intent = String(form.get("intent") ?? "");
+  if (intent === "add-machine") return createMachine(token, form);
+  if (intent === "delete-machine") return deleteMachine(token, form);
+  if (intent === "add-light") return createLight(token, form);
+  if (intent === "delete-light") return deleteLight(token, form);
+
+  const target = dhbwTarget(form);
+  if (!target) return { ok: false, message: "Unknown action" };
+
+  const res = await api(target.path, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(target.body ?? {}),
+    signal: AbortSignal.timeout(verifyTimeoutMs),
+  });
+
+  if (res.ok) return { ok: true, message: target.success };
+  if (res.status === unreachableStatus) {
+    return { ok: false, message: "Backend not reachable" };
+  }
+
+  const data = await res.json().catch(() => ({}));
+  return {
+    ok: false,
+    message: dhbwError(data.error, data.module ?? target.module, res.status),
+  };
+}
+
+export default function ConnectionsSettings({
+  loaderData,
+}: Route.ComponentProps) {
   return (
     <Stack>
-      <Block>
-        <Placeholder
-          icon={<Icon name="connections" className="size-5" />}
-          hint="Nothing connected."
-        />
-      </Block>
+      <DHBWConnection
+        account={loaderData.dhbw}
+        timetable={loaderData.timetable}
+      />
+      <MachineConnection machines={loaderData.machines} />
+      <LightsConnection lights={loaderData.lights} />
     </Stack>
   );
 }

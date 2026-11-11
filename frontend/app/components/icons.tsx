@@ -44,6 +44,13 @@ const paths: Record<string, ReactNode> = {
       <path d="m3.5 7.5 8.5 5.5 8.5-5.5" />
     </>
   ),
+  moodle: (
+    <>
+      <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5v-15Z" />
+      <path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3" />
+      <path d="M9 7.5h6" />
+    </>
+  ),
   pages: (
     <>
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
@@ -96,9 +103,24 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  filter: <path d="M4 5.5h16l-6.25 7.25v5.5l-3.5 1.75v-7.25L4 5.5Z" />,
+  reply: <path d="M9.5 14.5 4.5 9.5l5-5M4.5 9.5h9a6 6 0 0 1 6 6v3" />,
+  "reply-all": (
+    <path d="M8 14.5 3 9.5l5-5M12.5 14.5l-5-5 5-5M7.5 9.5h6.5a6 6 0 0 1 6 6v3" />
+  ),
+  forward: <path d="m14.5 14.5 5-5-5-5M19.5 9.5h-9a6 6 0 0 0-6 6v3" />,
   chevron: <path d="M9.5 6.5l5.5 5.5-5.5 5.5" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  power: (
+    <>
+      <path d="M12 3.5v7.5" />
+      <path d="M7.4 6.6a7.5 7.5 0 1 0 9.2 0" />
+    </>
+  ),
+  expand: <path d="M14.5 4.5h5v5M9.5 19.5h-5v-5M19.5 4.5l-6 6M4.5 19.5l6-6" />,
+  shrink: <path d="M19.5 9.5h-5v-5M4.5 14.5h5v5M14.5 9.5l6-6M9.5 14.5l-6 6" />,
   alert: (
     <>
       <path d="M12 8.5v5" />

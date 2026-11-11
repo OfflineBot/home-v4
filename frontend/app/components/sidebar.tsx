@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, NavLink, useLocation } from "react-router";
 import { Icon } from "./icons";
-import { accent, navItems, settingsItem } from "../lib/nav";
+import {
+  accent,
+  adminItem,
+  homeItem,
+  navItems,
+  settingsItem,
+} from "../lib/nav";
 import { cookieName } from "../lib/sidebar";
 
 const row =
-  "flex items-center justify-start overflow-hidden rounded-md px-2 outline-none focus-visible:ring-2 focus-visible:ring-ui-ring";
+  "flex items-center justify-start overflow-hidden rounded-md px-2 outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none";
 const slot = "grid size-6 shrink-0 place-items-center";
 
 type SidebarProps = {
   defaultOpen?: boolean;
+  isAdmin?: boolean;
 };
 
-export function Sidebar({ defaultOpen = true }: SidebarProps) {
+export function Sidebar({ defaultOpen = true, isAdmin = false }: SidebarProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [menuOpen, setMenuOpen] = useState(false);
   const account = useRef<HTMLDivElement>(null);
@@ -50,13 +57,13 @@ export function Sidebar({ defaultOpen = true }: SidebarProps) {
     }; path=/; max-age=31536000; samesite=lax`;
   }
 
-  const label = `truncate text-sm transition-[opacity,width,margin] duration-200 ease-out ${
-    open ? "ml-3 opacity-100" : "ml-0 w-0 opacity-0"
+  const label = `truncate text-sm transition-[opacity,margin,translate] duration-300 ease-out motion-reduce:transition-none ${
+    open ? "ml-3 translate-x-0 opacity-100" : "ml-0 w-0 -translate-x-1 opacity-0"
   }`;
 
   return (
     <aside
-      className={`flex shrink-0 flex-col transition-[width,padding] duration-200 ease-out ${
+      className={`flex shrink-0 flex-col transition-[width] duration-300 ease-out motion-reduce:transition-none ${
         open ? "w-60 px-2" : "w-14 px-2"
       }`}
     >
@@ -75,6 +82,27 @@ export function Sidebar({ defaultOpen = true }: SidebarProps) {
       </button>
 
       <nav className="mt-2 flex flex-col gap-0.5">
+        <NavLink
+          to="/"
+          end
+          title="Home"
+          style={accent(homeItem)}
+          className={({ isActive }) =>
+            `${row} h-9 hover:bg-ui-hover ${
+              isActive
+                ? "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)] text-[var(--accent-fg)]"
+                : "text-ui-fg-muted hover:text-ui-fg"
+            }`
+          }
+        >
+          <span className={`${slot} text-[var(--accent)]`}>
+            <Icon name="home" />
+          </span>
+          <span className={label}>{homeItem.label}</span>
+        </NavLink>
+
+        <div className="my-1 border-t border-ui-border-soft" />
+
         {navItems.map((item) => (
           <NavLink
             key={item.slug}
@@ -101,36 +129,52 @@ export function Sidebar({ defaultOpen = true }: SidebarProps) {
         ref={account}
         className="relative mt-auto border-t border-ui-border-soft pt-2"
       >
-        {menuOpen && (
-          <div
-            role="menu"
-            className="absolute bottom-full left-0 mb-2 w-48 rounded-lg border border-ui-border bg-ui-raised p-1"
-          >
+        <div
+          role="menu"
+          inert={!menuOpen}
+          className={`absolute bottom-full left-0 z-50 mb-2 w-48 origin-bottom-left rounded-lg border border-ui-border bg-ui-raised p-1 transition-[opacity,translate,scale,visibility] duration-200 ease-out motion-reduce:transition-none ${
+            menuOpen
+              ? "visible translate-y-0 scale-100 opacity-100"
+              : "invisible translate-y-1 scale-95 opacity-0"
+          }`}
+        >
+          {isAdmin && (
             <Link
-              to={`/${settingsItem.slug}`}
+              to={`/${adminItem.slug}`}
               role="menuitem"
-              style={accent(settingsItem)}
+              style={accent(adminItem)}
               className={`${row} gap-3 h-9 text-sm text-ui-fg-muted hover:bg-ui-hover hover:text-ui-fg`}
             >
               <span className={`${slot} text-[var(--accent)]`}>
-                <Icon name={settingsItem.slug} />
+                <Icon name="security" />
               </span>
-              {settingsItem.label}
+              {adminItem.label}
             </Link>
-            <Form method="post" action="/logout">
-              <button
-                type="submit"
-                role="menuitem"
-                className={`${row} gap-3 h-9 w-full cursor-pointer text-sm text-ui-fg-muted hover:bg-ui-hover hover:text-ui-fg`}
-              >
-                <span className={`${slot} text-ui-danger`}>
-                  <Icon name="logout" />
-                </span>
-                Logout
-              </button>
-            </Form>
-          </div>
-        )}
+          )}
+          <Link
+            to={`/${settingsItem.slug}`}
+            role="menuitem"
+            style={accent(settingsItem)}
+            className={`${row} gap-3 h-9 text-sm text-ui-fg-muted hover:bg-ui-hover hover:text-ui-fg`}
+          >
+            <span className={`${slot} text-[var(--accent)]`}>
+              <Icon name={settingsItem.slug} />
+            </span>
+            {settingsItem.label}
+          </Link>
+          <Form method="post" action="/logout">
+            <button
+              type="submit"
+              role="menuitem"
+              className={`${row} gap-3 h-9 w-full cursor-pointer text-sm text-ui-fg-muted hover:bg-ui-hover hover:text-ui-fg`}
+            >
+              <span className={`${slot} text-ui-danger`}>
+                <Icon name="logout" />
+              </span>
+              Logout
+            </button>
+          </Form>
+        </div>
 
         <button
           type="button"

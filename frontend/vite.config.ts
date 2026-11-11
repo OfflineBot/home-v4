@@ -11,7 +11,10 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      "/api": process.env.API_URL ?? "http://localhost:8080",
+      "/api": {
+        target: process.env.API_URL ?? "http://localhost:8080",
+        ws: true,
+      },
     },
   },
 });

@@ -7,6 +7,7 @@ export function meta({ params }: Route.MetaArgs) {
   return [{ title: params.page }];
 }
 
+//TODO: NOT WIRED!
 export default function Domain({ params }: Route.ComponentProps) {
   const item = allItems.find((entry) => entry.slug === params.page);
 

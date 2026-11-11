@@ -32,7 +32,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function AppLayout({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex h-screen overflow-hidden py-3 pr-3">
-      <Sidebar defaultOpen={loaderData.sidebarOpen} />
+      <Sidebar
+        defaultOpen={loaderData.sidebarOpen}
+        isAdmin={loaderData.user?.is_admin === true}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>

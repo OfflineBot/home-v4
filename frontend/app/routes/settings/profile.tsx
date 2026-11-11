@@ -15,13 +15,14 @@ export default function ProfileSettings() {
           me?.is_admin ? <Badge tone="accent">Administrator</Badge> : null
         }
       >
-        <div className="flex max-w-sm flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <input
             defaultValue={me?.name ?? ""}
             className={inputClass}
             disabled
           />
           <button
+            //TODO: NOT WIRED!
             type="button"
             className={`${buttonClass} self-start`}
             disabled

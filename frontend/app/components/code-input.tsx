@@ -112,7 +112,7 @@ export function CodeInput({ name, autoSubmit, disabled }: CodeInputProps) {
             onKeyDown={(e) => onKeyDown(index, e)}
             onPaste={onPaste}
             onFocus={(e) => e.target.select()}
-            className="size-11 rounded-md border border-ui-border bg-ui-field text-center text-lg text-ui-fg tabular-nums outline-none focus:border-ctp-mauve disabled:opacity-60"
+            className="size-11 rounded-md border border-ui-border-strong bg-ui-field text-center text-lg text-ui-fg tabular-nums outline-none focus:border-ctp-mauve disabled:opacity-60"
           />
         </div>
       ))}

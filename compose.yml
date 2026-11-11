@@ -7,11 +7,60 @@ services:
     environment:
       PORT: 8080
       DB_PATH: /data/home.db
+      WOL_SOCKET: /run/wol/wol.sock
+      N8N_URL: http://n8n:5678
+      AUTOMATION_BACKEND_URL: http://backend:8080
     volumes:
       - ./backend:/app
       - ./.data:/data
+      - wol-socket:/run/wol
     ports:
       - "8080:8080"
+    depends_on:
+      - wol
+      - n8n
+
+  wol:
+    build:
+      context: ./backend
+      target: wol
+    network_mode: host
+    environment:
+      WOL_SOCKET: /run/wol/wol.sock
+    volumes:
+      - wol-socket:/run/wol
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:2.47.4
+    environment:
+      N8N_HOST: n8n
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      GENERIC_TIMEZONE: Europe/Berlin
+      TZ: Europe/Berlin
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
+      N8N_HIRING_BANNER_ENABLED: "false"
+      N8N_PUBLIC_API_SWAGGERUI_DISABLED: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      N8N_RESTRICT_FILE_ACCESS_TO: /home/node/.n8n-files
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+      N8N_CUSTOM_EXTENSIONS: /opt/home-v4-nodes
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/nodes:/opt/home-v4-nodes:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
@@ -27,3 +76,7 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+volumes:
+  wol-socket:
+  n8n-data:

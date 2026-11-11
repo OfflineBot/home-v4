@@ -3,6 +3,7 @@ import { useRouteLoaderData, useSubmit } from "react-router";
 import type { Route } from "./+types/security";
 import {
   buttonClass,
+  fieldGridClass,
   fieldStackClass,
   dangerButtonClass,
   inputClass,
@@ -143,23 +144,25 @@ export default function SecuritySettings({ actionData }: Route.ComponentProps) {
       <Stack>
         <Block title="Password">
           <form onSubmit={changePassword} className={fieldStackClass}>
-            <input
-              type="password"
-              name="current"
-              required
-              placeholder="Current password"
-              autoComplete="current-password"
-              className={inputClass}
-            />
-            <input
-              type="password"
-              name="next"
-              required
-              minLength={minPasswordLength}
-              placeholder="New password"
-              autoComplete="new-password"
-              className={inputClass}
-            />
+            <div className={fieldGridClass}>
+              <input
+                type="password"
+                name="current"
+                required
+                placeholder="Current password"
+                autoComplete="current-password"
+                className={inputClass}
+              />
+              <input
+                type="password"
+                name="next"
+                required
+                minLength={minPasswordLength}
+                placeholder="New password"
+                autoComplete="new-password"
+                className={inputClass}
+              />
+            </div>
             <button
               type="submit"
               disabled={busy}

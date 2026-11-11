@@ -12,6 +12,17 @@ export default [
   ]),
 
   route("logout", "routes/logout.tsx"),
+  route("calendar/api", "routes/calendar.api.ts"),
+  route("sync/:job", "routes/sync.job.ts"),
+  route("moodle/media/:kind/:id", "routes/moodle.media.ts"),
+  route("moodle/:id/zip", "routes/moodle.zip.ts"),
+  route("mail/media/:id", "routes/mail.media.ts"),
+  route("automation/api", "routes/automation.api.ts"),
+  route("automation/icons/*", "routes/automation.icons.ts"),
+  route("mail/contacts", "routes/mail.contacts.ts"),
+  route("machine/status/:id", "routes/machine.status.ts"),
+  route("machine/terminal/:id", "routes/machine.terminal.ts"),
+  route("lights/api", "routes/lights.api.ts"),
 
   layout("layouts/app.tsx", [
     index("routes/home.tsx"),
@@ -27,6 +38,16 @@ export default [
       route("delete", "routes/settings/delete.tsx"),
     ]),
 
+    route("admin", "routes/admin.tsx"),
+    route("calendar", "routes/calendar.tsx"),
+    route("grades", "routes/grades.tsx"),
+    route("mail", "routes/mail.tsx"),
+    route("moodle", "routes/moodle.tsx"),
+    route("moodle/:id", "routes/moodle.course.tsx"),
+    route("machine", "routes/machine.tsx"),
+    route("lights", "routes/lights.tsx"),
+    route("automation", "routes/automation.tsx"),
+    route("automation/:id", "routes/automation.workflow.tsx"),
     route(":page", "routes/domain.tsx"),
   ]),
 ] satisfies RouteConfig;

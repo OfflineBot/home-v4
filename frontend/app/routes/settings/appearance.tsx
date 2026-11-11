@@ -14,18 +14,24 @@ function Preview({ theme }: { theme: Theme }) {
   return (
     <span
       data-theme={theme}
-      className="flex h-12 w-20 shrink-0 gap-1 rounded-md border border-ui-border bg-ui-frame p-1.5"
+      className="flex h-28 w-52 gap-2 rounded-md border border-ui-border bg-ui-frame p-2"
       aria-hidden
     >
-      <span className="flex w-3 flex-col gap-1">
-        <span className="h-1.5 rounded-xs bg-ctp-mauve" />
-        <span className="h-1.5 rounded-xs bg-ctp-blue" />
-        <span className="h-1.5 rounded-xs bg-ctp-green" />
+      <span className="flex w-7 shrink-0 flex-col gap-1.5">
+        <span className="h-2 rounded-sm bg-ctp-mauve" />
+        <span className="h-2 rounded-sm bg-ctp-blue" />
+        <span className="h-2 rounded-sm bg-ctp-green" />
+        <span className="h-2 rounded-sm bg-ctp-peach" />
+        <span className="h-2 rounded-sm bg-ctp-pink" />
       </span>
-      <span className="flex flex-1 flex-col gap-1 rounded-sm bg-ui-surface p-1">
-        <span className="h-1 w-full rounded-xs bg-ui-fg-muted" />
-        <span className="h-1 w-2/3 rounded-xs bg-ui-fg-faint" />
-        <span className="mt-auto h-2 w-full rounded-xs bg-ui-raised" />
+      <span className="flex flex-1 flex-col gap-1.5 rounded border border-ui-border bg-ui-surface p-2">
+        <span className="h-2 w-1/3 rounded-sm bg-ui-fg" />
+        <span className="h-1.5 w-full rounded-sm bg-ui-fg-muted" />
+        <span className="h-1.5 w-2/3 rounded-sm bg-ui-fg-faint" />
+        <span className="mt-auto flex h-7 items-center gap-1.5 rounded border border-ui-border bg-ui-raised px-1.5">
+          <span className="h-1.5 flex-1 rounded-sm bg-ui-fg-muted" />
+          <span className="h-3 w-8 rounded-sm bg-ctp-mauve" />
+        </span>
       </span>
     </span>
   );
@@ -38,6 +44,7 @@ export default function AppearanceSettings() {
       : ((document.documentElement.dataset.theme as Theme) ?? "dark"),
   );
 
+  //TODO: NOT WIRED!
   function choose(theme: Theme) {
     applyTheme(theme);
     setCurrent(theme);
@@ -56,7 +63,7 @@ export default function AppearanceSettings() {
                 type="button"
                 onClick={() => choose(theme.value)}
                 aria-pressed={active}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2 pr-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ui-ring ${
+                className={`flex cursor-pointer flex-col gap-2.5 rounded-lg border p-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ui-ring ${
                   active
                     ? "border-ctp-mauve bg-ui-hover"
                     : "border-ui-border hover:bg-ui-hover"

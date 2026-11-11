@@ -1,6 +1,12 @@
 {$SITE_ADDRESS} {
 	tls internal
 
-	encode zstd gzip
-	reverse_proxy frontend:3000
+	handle /api/machine/terminals/connect {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy frontend:3000
+	}
 }

@@ -6,7 +6,12 @@ export default function DeleteAccountSettings() {
     <Stack>
       <Block title="Delete account">
         <p className="text-sm text-ui-fg-muted">This cannot be undone.</p>
-        <button type="button" className={`${dangerButtonClass} mt-3`} disabled>
+        <button
+          //TODO: NOT WIRED!
+          type="button"
+          className={`${dangerButtonClass} mt-3`}
+          disabled
+        >
           Delete account
         </button>
       </Block>

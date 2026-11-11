@@ -22,8 +22,10 @@ export function Toast({ message }: ToastProps) {
     <div
       role="alert"
       aria-live="assertive"
-      className={`fixed top-3 right-3 z-50 flex w-72 items-start gap-3 rounded-lg border border-ui-border bg-ui-raised p-3 transition-[opacity,transform] duration-200 ease-out ${
-        visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
+      className={`fixed top-3 right-3 z-50 flex w-72 items-start gap-3 rounded-lg border border-ui-border bg-ui-raised p-3 transition-[opacity,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
+        visible
+          ? "visible translate-y-0 opacity-100"
+          : "pointer-events-none invisible -translate-y-2 opacity-0"
       }`}
     >
       <span className="grid size-5 shrink-0 place-items-center text-ui-danger">
