@@ -1,8 +1,17 @@
 export type DHBWModule = "dualis" | "mail" | "moodle";
 
+export type DualisGuard = {
+  failures: number;
+  max_failures: number;
+  locked: boolean;
+  next_attempt_at: string | null;
+  last_failure_at: string | null;
+};
+
 export type DHBWAccount = {
   name: string | null;
   logins: Partial<Record<DHBWModule, string>>;
+  dualis_guard?: DualisGuard | null;
 } & Record<DHBWModule, boolean>;
 
 export type DHBWResult = {
@@ -94,6 +103,12 @@ export function dhbwError(
       return "Unknown service.";
     case "too_many_attempts":
       return "Too many attempts. Wait a minute and try again.";
+    case "locked":
+      return "Dualis is locked after failed logins. Reset the lock first.";
+    case "backoff":
+      return "Dualis waits before the next login attempt. Try again later.";
+    case "confirm_required":
+      return "Confirm the reset first.";
     default:
       return `Failed (${status})`;
   }

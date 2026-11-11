@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/lights";
-import { Badge, Block, Stack } from "../components/block";
+import { Block, Stack } from "../components/block";
 import { Icon } from "../components/icons";
 import { AllLightsCard, LightCard } from "../components/lights/light-card";
 import { useLights } from "../components/lights/use-lights";
@@ -10,7 +10,6 @@ import { buttonClass, primaryButtonClass } from "../components/setting-row";
 import { Toast } from "../components/toast";
 import type { Light } from "../lib/light";
 import { listLights } from "../lib/light.server";
-import { demoLights } from "../lib/light-demo";
 import { navColor } from "../lib/nav";
 import { requireToken } from "../lib/session";
 
@@ -20,11 +19,10 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
-  const lights = await listLights(token);
-  return lights.length > 0 ? { lights, demo: false } : { lights: demoLights, demo: true };
+  return { lights: await listLights(token) };
 }
 
-function LightsBoard({ lights, demo }: { lights: Light[]; demo: boolean }) {
+function LightsBoard({ lights }: { lights: Light[] }) {
   const [failure, setFailure] = useState({ message: "", attempt: 0 });
   const { entries, apply, load } = useLights(lights, (message) =>
     setFailure((current) => ({ message, attempt: current.attempt + 1 })),
@@ -43,7 +41,6 @@ function LightsBoard({ lights, demo }: { lights: Light[]; demo: boolean }) {
       color={navColor("lights")}
       actions={
         <>
-          {demo && <Badge>Demo</Badge>}
           <button
             type="button"
             disabled={reachable.length === 0}
@@ -82,7 +79,7 @@ function LightsBoard({ lights, demo }: { lights: Light[]; demo: boolean }) {
 }
 
 export default function Lights({ loaderData }: Route.ComponentProps) {
-  const { lights, demo } = loaderData;
+  const { lights } = loaderData;
 
   if (lights.length === 0) {
     return (
@@ -101,5 +98,5 @@ export default function Lights({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  return <LightsBoard key={lights.map((light) => light.id).join(",")} lights={lights} demo={demo} />;
+  return <LightsBoard key={lights.map((light) => light.id).join(",")} lights={lights} />;
 }

@@ -1,5 +1,4 @@
 import type { Machine } from "./machine";
-import { isDemoMachine, openDemoTerminal } from "./machine-demo";
 
 export type TerminalSize = { cols: number; rows: number };
 
@@ -141,7 +140,6 @@ export function openTerminal(
   size: TerminalSize,
   handlers: TerminalHandlers,
 ): TerminalLink {
-  if (isDemoMachine(machine.id)) return openDemoTerminal(machine, session, size, handlers);
   const encoder = new TextEncoder();
   let socket: WebSocket | null = null;
   let closed = false;

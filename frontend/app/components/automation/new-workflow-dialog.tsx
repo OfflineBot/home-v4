@@ -47,8 +47,6 @@ export function NewWorkflowDialog({ open, onClose }: NewWorkflowDialogProps) {
       return;
     }
 
-    if (chosen.activate) await automationApi.activate(created.data.id);
-
     setBusy(false);
     onClose();
     navigate(`/automation/${created.data.id}`);

@@ -1,5 +1,3 @@
-import { demoApply, demoRead, isDemoLight } from "./light-demo";
-
 export type Light = {
   id: number;
   name: string;
@@ -205,7 +203,6 @@ async function read<T>(res: Response): Promise<T> {
 }
 
 async function get<T>(op: string, id: number) {
-  if (isDemoLight(id)) return (await demoRead(op, id)) as T;
   let res: Response;
   try {
     res = await fetch(`${endpoint}?${new URLSearchParams({ op, id: String(id) })}`);
@@ -221,7 +218,6 @@ export const lightsApi = {
   presets: (id: number) =>
     get<{ presets?: LightPreset[] | null }>("presets", id).then((data) => data.presets ?? []),
   async apply(id: number, change: LightChange) {
-    if (isDemoLight(id)) return demoApply(id, change);
     let res: Response;
     try {
       res = await fetch(endpoint, {

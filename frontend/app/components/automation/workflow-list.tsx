@@ -24,7 +24,7 @@ export function WorkflowList({ workflows, icons, disabled }: WorkflowListProps) 
     return (
       <Placeholder
         icon={<Icon name="automation" />}
-        hint="No workflows yet. Press New workflow and pick Test run to see n8n answer within seconds."
+        hint="No workflows yet."
       />
     );
   }

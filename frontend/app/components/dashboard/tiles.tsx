@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Badge } from "../block";
 import { Icon } from "../icons";
 import { buttonClass, primaryButtonClass } from "../setting-row";
 import { Toast } from "../toast";
@@ -15,7 +14,6 @@ import {
 } from "../../lib/dashboard";
 import { formatAverage } from "../../lib/grades";
 import { lightsApi, type Light, type LightState } from "../../lib/light";
-import { demoLights } from "../../lib/light-demo";
 
 export type MailSummary = { connected: boolean; unread: number | null };
 export type AverageSummary = { connected: boolean; value: number | null; count: number };
@@ -151,8 +149,7 @@ type Entry = LightState | "loading" | "error";
 const refreshMs = 60_000;
 
 export function LightsTile({ lights }: { lights: Light[] }) {
-  const demo = lights.length === 0;
-  const shown = demo ? demoLights : lights;
+  const shown = lights;
   const [states, setStates] = useState<Record<number, Entry>>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState({ message: "", attempt: 0 });
@@ -210,12 +207,13 @@ export function LightsTile({ lights }: { lights: Light[] }) {
   }
 
   const blocked = known.length === 0 || busy;
+  if (shown.length === 0) return null;
 
   return (
     <>
       <div className={`${frameClass} ${anyOn ? "border-[color-mix(in_oklab,var(--ctp-pink)_55%,transparent)]" : ""}`}>
         <Link to="/lights" className={`-m-2 flex flex-col gap-3 rounded-lg p-2 ${linkClass}`}>
-          <Heading aside={demo && <Badge>Demo</Badge>}>Lights</Heading>
+          <Heading>Lights</Heading>
           <span className="flex flex-wrap items-center gap-2.5">
             {shown.map((light) => {
               const entry = states[light.id];

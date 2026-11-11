@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Badge, ExpandableBlock } from "../block";
 import { Icon } from "../icons";
 import { buttonClass, dangerButtonClass } from "../setting-row";
+import { formatStamp } from "../../lib/sync";
 import { useSubmission } from "../use-submission";
 import {
   coursePattern,
@@ -10,6 +11,7 @@ import {
   splitCourse,
   type DHBWAccount,
   type DHBWModule,
+  type DualisGuard,
 } from "../../lib/dhbw";
 import { navColor } from "../../lib/nav";
 
@@ -45,6 +47,9 @@ export function DHBWConnection({ account, timetable }: DHBWConnectionProps) {
               />
             ))}
           </div>
+
+          {account?.dualis_guard && <GuardRow guard={account.dualis_guard} />}
+          {dhbwModules.some((module) => account?.[module.name]) && <RemoveAllRow />}
         </Section>
 
         <Section title="Timetable">
@@ -66,8 +71,86 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function ConfirmButton({ intent, label, busyLabel, busy, active }: {
+  intent: string;
+  label: string;
+  busyLabel: string;
+  busy: boolean;
+  active: boolean;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!busy) setConfirming(false);
+  }, [busy]);
+
+  if (!confirming) {
+    return (
+      <button type="button" onClick={() => setConfirming(true)} disabled={busy} className={dangerButtonClass}>
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => setConfirming(false)} disabled={busy} className={buttonClass}>
+        Cancel
+      </button>
+      <button type="submit" name="intent" value={intent} formNoValidate disabled={busy} className={dangerButtonClass}>
+        {busy && active ? busyLabel : `Confirm ${label.toLowerCase()}`}
+      </button>
+    </>
+  );
+}
+
+function RemoveAllRow() {
+  const { fetcher, busy, intent, toast } = useSubmission();
+
+  return (
+    <fetcher.Form method="post" className="flex flex-wrap items-center gap-2">
+      <span className="min-w-0 flex-1 text-sm text-ui-fg-muted">Remove every saved DHBW password at once.</span>
+      <ConfirmButton
+        intent="dhbw-passwords-remove"
+        label="Remove all"
+        busyLabel="Removing…"
+        busy={busy}
+        active={intent === "dhbw-passwords-remove"}
+      />
+      {toast}
+    </fetcher.Form>
+  );
+}
+
+function GuardRow({ guard }: { guard: DualisGuard }) {
+  const { fetcher, busy, intent, toast } = useSubmission();
+  if (!guard.locked && guard.failures === 0) return null;
+
+  return (
+    <fetcher.Form method="post" className="flex flex-wrap items-center gap-2">
+      {guard.locked ? (
+        <Badge tone="bad">Locked</Badge>
+      ) : (
+        <Badge>{`${guard.failures} of ${guard.max_failures} failed logins`}</Badge>
+      )}
+      {guard.next_attempt_at && !guard.locked && (
+        <span className="text-xs text-ui-fg-muted">Next try {formatStamp(guard.next_attempt_at)}</span>
+      )}
+      <span className="flex-1" />
+      <ConfirmButton
+        intent="dualis-reset"
+        label="Reset lock"
+        busyLabel="Resetting…"
+        busy={busy}
+        active={intent === "dualis-reset"}
+      />
+      {toast}
+    </fetcher.Form>
+  );
+}
+
 function NameRow({ name }: { name: string | null }) {
-  const { fetcher, busy, fieldClass, toast } = useSubmission();
+  const { fetcher, busy, intent, fieldClass, toast } = useSubmission();
 
   return (
     <fetcher.Form method="post" className={fieldRowClass}>
@@ -92,8 +175,17 @@ function NameRow({ name }: { name: string | null }) {
           disabled={busy}
           className={buttonClass}
         >
-          {busy ? "Saving…" : "Save"}
+          {busy && intent === "dhbw-name" ? "Saving…" : "Save"}
         </button>
+        {name && (
+          <ConfirmButton
+            intent="dhbw-name-remove"
+            label="Remove"
+            busyLabel="Removing…"
+            busy={busy}
+            active={intent === "dhbw-name-remove"}
+          />
+        )}
       </div>
       {toast}
     </fetcher.Form>

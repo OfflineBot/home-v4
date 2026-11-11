@@ -48,7 +48,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 type DHBWTarget = {
   path: string;
-  body?: Record<string, string>;
+  body?: Record<string, string | boolean>;
   module: string;
   success: string;
 };
@@ -63,6 +63,28 @@ function dhbwTarget(form: FormData): DHBWTarget | null {
       body: { name: String(form.get("name") ?? "") },
       module,
       success: "Username saved.",
+    };
+  }
+  if (intent === "dhbw-name-remove") {
+    return {
+      path: `${dhbwPath}/name/delete`,
+      module,
+      success: "Username removed.",
+    };
+  }
+  if (intent === "dhbw-passwords-remove") {
+    return {
+      path: `${dhbwPath}/passwords/delete`,
+      module,
+      success: "All passwords removed.",
+    };
+  }
+  if (intent === "dualis-reset") {
+    return {
+      path: `${dhbwPath}/dualis/reset`,
+      body: { confirm: true },
+      module: "dualis",
+      success: "Dualis lock reset. The next sync tries again.",
     };
   }
   if (intent === "timetable-set") {

@@ -87,7 +87,7 @@ export function ClockCard({ now, plan, calendarFailed, average, mail, notices, l
         </Link>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none">
         <AverageTile average={average} />
         <MailTile mail={mail} />
         <LightsTile lights={lights} />

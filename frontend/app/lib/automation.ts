@@ -587,7 +587,6 @@ export type Template = {
   id: string;
   title: string;
   description: string;
-  activate: boolean;
   build: () => WorkflowNode[];
 };
 
@@ -606,50 +605,15 @@ function webhookNode(responseMode: string): WorkflowNode {
 
 export const templates: Template[] = [
   {
-    id: "test",
-    title: "Test run",
-    description:
-      "Webhook that answers with a message. It is activated right away so you can press Run and see n8n working.",
-    activate: true,
-    build: () => [
-      webhookNode("lastNode"),
-      {
-        id: newId(),
-        name: "Reply",
-        type: "n8n-nodes-base.set",
-        typeVersion: 3.4,
-        position: [260, 0],
-        parameters: {
-          mode: "manual",
-          assignments: {
-            assignments: [
-              { id: newId(), name: "message", value: "It works!", type: "string" },
-              {
-                id: newId(),
-                name: "received",
-                value: "={{ $json.body }}",
-                type: "object",
-              },
-              { id: newId(), name: "at", value: "={{ $now.toISO() }}", type: "string" },
-            ],
-          },
-          options: {},
-        },
-      },
-    ],
-  },
-  {
     id: "webhook",
     title: "Webhook",
     description: "Starts when you press Run. The answer is the output of the last step.",
-    activate: false,
     build: () => [webhookNode("lastNode")],
   },
   {
     id: "schedule",
     title: "Schedule",
     description: "Runs on its own, every hour by default.",
-    activate: false,
     build: () => [
       {
         id: newId(),
@@ -666,7 +630,6 @@ export const templates: Template[] = [
     title: "Before the first lecture",
     description:
       "45 minutes before your first lecture: wake your PC and turn on a light. Pick the machine and light, then activate.",
-    activate: false,
     build: () => [
       {
         id: newId(),
@@ -703,7 +666,6 @@ export const templates: Template[] = [
     id: "empty",
     title: "Empty",
     description: "Pick the trigger yourself.",
-    activate: false,
     build: () => [],
   },
 ];
