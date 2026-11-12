@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useRevalidator } from "react-router";
 import { Placeholder } from "../block";
 import { Icon } from "../icons";
 import { adaptFrame } from "./frame";
@@ -8,6 +8,7 @@ import {
   formatReceivedLong,
   mailFrame,
   senderLabel,
+  setRead,
   type ComposeMode,
   type MailDetail,
 } from "../../lib/mail";
@@ -60,6 +61,7 @@ type MessageProps = {
 };
 
 function Message({ detail, backHref, onCompose }: MessageProps) {
+  const revalidator = useRevalidator();
   const files = (detail.attachments ?? []).filter(
     (attachment) => !attachment.is_inline,
   );
@@ -81,6 +83,18 @@ function Message({ detail, backHref, onCompose }: MessageProps) {
             {detail.subject || "(no subject)"}
           </h2>
           <div className="-my-0.5 flex shrink-0 gap-0.5">
+            <button
+              type="button"
+              onClick={async () => {
+                await setRead(detail.id, !detail.is_read);
+                revalidator.revalidate();
+              }}
+              aria-label={detail.is_read ? "Mark as unread" : "Mark as read"}
+              title={detail.is_read ? "Mark as unread" : "Mark as read"}
+              className="grid size-8 cursor-pointer place-items-center rounded-md text-ui-fg-muted outline-none transition-colors hover:bg-ui-hover hover:text-ui-fg focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none"
+            >
+              <Icon name={detail.is_read ? "mail" : "check"} className="size-4" />
+            </button>
             {replyModes.map((entry) => (
               <button
                 key={entry.mode}

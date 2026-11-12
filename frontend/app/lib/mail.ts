@@ -45,15 +45,34 @@ export type MailDetail = MailMessage & {
   attachments: MailAttachment[] | null;
 };
 
-export function mailHref(params: {
-  folder: string;
-  message?: string;
-  offset?: number;
-}) {
+export type MailFilter = {
+  unread?: boolean;
+  attachments?: boolean;
+  q?: string;
+};
+
+export function mailHref(
+  params: {
+    folder: string;
+    message?: string;
+    offset?: number;
+  } & MailFilter,
+) {
   const search = new URLSearchParams({ folder: params.folder });
   if (params.offset) search.set("offset", String(params.offset));
   if (params.message) search.set("message", params.message);
+  if (params.unread) search.set("unread", "true");
+  if (params.attachments) search.set("attachments", "true");
+  if (params.q) search.set("q", params.q);
   return `?${search}`;
+}
+
+export function filterCount(filter: MailFilter) {
+  return (
+    (filter.unread ? 1 : 0) +
+    (filter.attachments ? 1 : 0) +
+    (filter.q ? 1 : 0)
+  );
 }
 
 export function isActiveFolder(folder: MailFolder, ref: string) {
@@ -235,4 +254,14 @@ export function mailFrame(detail: MailDetail) {
   }
 
   return `<!doctype html><html><head>${frameHead}</head><body>${html}</body></html>`;
+}
+
+export async function setRead(id: string, read: boolean) {
+  const res = await fetch("/mail/read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, read }),
+  });
+
+  return res.ok;
 }

@@ -14,7 +14,7 @@ import {
   textareaClass,
 } from "../setting-row";
 import { TimeInput } from "../time-input";
-import { dayLong, parseDay } from "../../lib/calendar";
+import { dayLong, formatTime, parseDay } from "../../lib/calendar";
 import {
   eventMarks,
   type CalendarCategory,
@@ -34,6 +34,11 @@ type EventDialogProps = {
   onDelete: (id: string) => Promise<void>;
   onMark: (event: CalendarEvent, mark: EventMark) => Promise<void>;
 };
+
+function hourAfter(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return formatTime(Math.min(hours * 60 + minutes + 60, 23 * 60 + 59));
+}
 
 export function EventDialog({
   draft,
@@ -329,7 +334,14 @@ function EventForm({
 
       <div className={fieldGridClass}>
         <Field label="Start">
-          <TimeInput value={start} onChange={setStart} required />
+          <TimeInput
+            value={start}
+            onChange={(next) => {
+              setStart(next);
+              if (end <= next) setEnd(hourAfter(next));
+            }}
+            required
+          />
         </Field>
         <Field label="End">
           <TimeInput value={end} onChange={setEnd} required />

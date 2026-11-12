@@ -267,6 +267,7 @@ func integrationMail(c fiber.Ctx) error {
 	messages, total, err := mail.Messages(
 		integrationUser(c),
 		c.Query("folder", "inbox"),
+		mail.Filter{UnreadOnly: c.Query("unread") == "true"},
 		fiber.Query(c, "limit", 25),
 		0,
 	)

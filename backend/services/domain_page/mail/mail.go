@@ -55,7 +55,9 @@ func Folders(userID int64) ([]Folder, error) {
 	return store.MailFolders(db.DB, userID)
 }
 
-func Messages(userID int64, ref string, limit, offset int) ([]Message, int, error) {
+type Filter = store.MailFilter
+
+func Messages(userID int64, ref string, filter Filter, limit, offset int) ([]Message, int, error) {
 	folder, err := store.MailFolderByRef(db.DB, userID, ref)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, ErrUnknownFolder
@@ -70,7 +72,41 @@ func Messages(userID int64, ref string, limit, offset int) ([]Message, int, erro
 		offset = 0
 	}
 
-	return store.MailMessages(db.DB, userID, folder.ID, limit, offset)
+	return store.MailMessages(db.DB, userID, folder.ID, filter, limit, offset)
+}
+
+func SetRead(userID int64, id string, read bool) error {
+	detail, err := store.MailDetailByID(db.DB, userID, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if detail.IsRead == read {
+		return nil
+	}
+
+	raw, err := email.DecodeItemID(detail.EWSID)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	creds, err := connections.Login(userID, connections.Mail)
+	if err != nil {
+		return err
+	}
+
+	if read {
+		err = email.MarkReadByID(connections.MailServer, creds.Username, creds.Password, raw)
+	} else {
+		err = email.MarkUnreadByID(connections.MailServer, creds.Username, creds.Password, raw)
+	}
+	if err != nil {
+		return err
+	}
+
+	return store.SetMailRead(db.DB, userID, id, read)
 }
 
 func MessageByID(userID int64, id string) (*Detail, error) {

@@ -41,11 +41,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   const folder = url.searchParams.get("folder") || defaultFolder;
   const messageId = url.searchParams.get("message");
   const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+  const filter = {
+    unread: url.searchParams.get("unread") === "true",
+    attachments: url.searchParams.get("attachments") === "true",
+    q: (url.searchParams.get("q") ?? "").trim(),
+  };
   const query = new URLSearchParams({
     folder,
     limit: String(mailPageSize),
     offset: String(offset),
   });
+  if (filter.unread) query.set("unread", "true");
+  if (filter.attachments) query.set("attachments", "true");
+  if (filter.q) query.set("q", filter.q);
 
   const [foldersRes, listRes, detailRes, sync, connected] = await Promise.all([
     api("/api/mail/folders", { headers }),
@@ -74,6 +82,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     folders,
     folder,
     offset,
+    filter,
     messages: list.messages ?? [],
     total: list.total ?? 0,
     detail,
@@ -83,7 +92,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Mail({ loaderData }: Route.ComponentProps) {
-  const { folders, folder, offset, messages, total, detail, sync, connected } =
+  const { folders, folder, offset, filter, messages, total, detail, sync, connected } =
     loaderData;
   const navigation = useNavigation();
   const [draft, setDraft] = useState<ComposeDraft | null>(null);
@@ -140,6 +149,7 @@ export default function Mail({ loaderData }: Route.ComponentProps) {
             messages={messages}
             total={total}
             offset={offset}
+            filter={filter}
             selected={selected}
             className={`min-w-0 flex-1 lg:w-80 lg:flex-none 2xl:w-96 ${
               side ? "hidden lg:flex" : "flex"
@@ -155,7 +165,7 @@ export default function Mail({ loaderData }: Route.ComponentProps) {
           ) : (
             <Reader
               detail={detail}
-              backHref={mailHref({ folder, offset })}
+              backHref={mailHref({ folder, offset, ...filter })}
               loading={loading}
               onCompose={(message, mode) => setDraft(composeFrom(message, mode))}
               className={selected ? "flex" : "hidden lg:flex"}

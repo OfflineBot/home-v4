@@ -1,8 +1,5 @@
-import { useState, type InputHTMLAttributes } from "react";
+import { type InputHTMLAttributes } from "react";
 import { inputClass } from "./setting-row";
-import { parseTime } from "../lib/calendar";
-
-const complete = /^\d{2}:\d{2}$/;
 
 type TimeInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -13,42 +10,16 @@ type TimeInputProps = Omit<
 };
 
 export function TimeInput({ value, onChange, ...rest }: TimeInputProps) {
-  const [text, setText] = useState(value);
-  const [synced, setSynced] = useState(value);
-
-  if (value !== synced) {
-    setSynced(value);
-    setText(value);
-  }
-
-  function commit(next: string) {
-    setSynced(next);
-    onChange(next);
-  }
-
   return (
     <input
       {...rest}
-      type="text"
-      value={text}
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder="HH:MM"
-      maxLength={5}
-      pattern="([01]\d|2[0-3]):[0-5]\d"
+      type="time"
+      step={300}
+      value={value}
       onChange={(event) => {
-        setText(event.target.value);
-        const parsed = complete.test(event.target.value)
-          ? parseTime(event.target.value)
-          : null;
-        if (parsed) commit(parsed);
+        if (event.target.value) onChange(event.target.value);
       }}
-      onBlur={() => {
-        const parsed = parseTime(text);
-        setText(parsed ?? value);
-        if (parsed) commit(parsed);
-      }}
-      className={`${inputClass} tabular-nums`}
+      className={`${inputClass} tabular-nums [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100`}
     />
   );
 }

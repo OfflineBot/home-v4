@@ -17,6 +17,7 @@ export const navItems: NavItem[] = [
   { slug: "mail", label: "Mail", color: "teal" },
   { slug: "moodle", label: "Moodle", color: "sky" },
   { slug: "pages", label: "Pages", color: "lavender" },
+  { slug: "public", label: "Public", color: "flamingo" },
 ];
 
 export const homeItem: NavItem = {

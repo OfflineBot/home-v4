@@ -184,6 +184,45 @@ state of what they have already seen themselves, so these stay plain reads. A ma
 that is not connected yet answers an empty list instead of an error, because a trigger
 starts polling long before that.
 
+## Public store
+
+One bucket for everyone, not a folder per user: `public_files` is a flat table and the
+bytes live under `files/public/<id>`. Reading needs nothing at all - no session, no key -
+because the point is a link that works in a browser, in a script and in whatever an
+agent is running. `isPublicPath` lets every `/api/public/*` route through except
+`/api/public/manage/*`, which is where the account-only parts sit.
+
+Writing needs the key in `public_store.upload_key` unless `uploads_open` is on, which is
+the switch for the days where it should take anything at all. A file is capped at 512 MB,
+the bucket at 8 GB and 500 files; the upload is streamed, so neither the backend nor the
+proxy ever holds it in memory, which is why `/api/public/upload` is exempt from
+`bufferBody` the way the private upload is.
+
+| Method and path | Needs | Body or query | Answers |
+| --- | --- | --- | --- |
+| `GET /api/public/files` | - | - | `200` `{files, usage}` |
+| `GET /api/public/files/:id` | - | - | the file, with ranges and an ETag |
+| `GET /api/public/files/:id/:name` | - | - | the same, with a readable URL |
+| `PUT|POST /api/public/upload` | key | `key`, `name`, `from`, body or `file` part | `201` the file, `401`, `413`, `507` |
+| `GET /api/public/manage/settings` | session | - | `200` `{uploads_open, upload_key}` |
+| `POST /api/public/manage/settings` | session | `uploads_open` | `200` settings |
+| `POST /api/public/manage/settings/key` | session | - | `200` settings, old lines dead |
+| `POST /api/public/manage/delete` | session | `id` | `204`, `404` |
+
+	curl -T report.pdf "https://home.example/api/public/upload?key=KEY&name=report.pdf"
+
+## Mail
+
+`GET /api/mail/messages` narrows with `unread`, `attachments` and `q`; the filter is SQL
+on the synced copy, so it costs nothing at Exchange and works offline of it. `q` matches
+subject, sender name and sender address, and escapes `%` and `_` so a search for one is
+not a wildcard.
+
+`POST /api/mail/messages/read` with `{id, read}` writes through: EWS first with
+`UpdateItem` on `message:IsRead`, the local row only after it took. A failure answers
+the mail error and leaves the row alone, because a read state that only exists here
+would be a lie the next sync silently corrects.
+
 ## Environment
 
 | Variable | Used for |

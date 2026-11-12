@@ -21,12 +21,14 @@ export default [
   route("automation/icons/*", "routes/automation.icons.ts"),
   route("mail/contacts", "routes/mail.contacts.ts"),
   route("mail/export", "routes/mail.export.ts"),
+  route("mail/read", "routes/mail.read.ts"),
   route("machine/status/:id", "routes/machine.status.ts"),
   route("machine/terminal/:id", "routes/machine.terminal.ts"),
   route("lights/api", "routes/lights.api.ts"),
   route("files/api", "routes/files.api.ts"),
   route("git/api", "routes/git.api.ts"),
   route("pages/api", "routes/pages.api.ts"),
+  route("public/api", "routes/public.api.ts"),
 
   layout("layouts/app.tsx", [
     index("routes/home.tsx"),
@@ -57,6 +59,7 @@ export default [
     route("git/:project/:repo", "routes/git.repo.tsx"),
     route("git/:project/:repo/commit/:hash", "routes/git.commit.tsx"),
     route("pages", "routes/pages.tsx"),
+    route("public", "routes/public.tsx"),
     route("automation", "routes/automation.tsx"),
     route("automation/:id", "routes/automation.workflow.tsx"),
     route(":page", "routes/domain.tsx"),

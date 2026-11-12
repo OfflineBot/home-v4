@@ -96,6 +96,12 @@ const paths: Record<string, ReactNode> = {
       <path d="M10 19a2 2 0 0 0 4 0" />
     </>
   ),
+  public: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16M12 4a13 13 0 0 1 0 16M12 4a13 13 0 0 0 0 16" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4.5 7h15M9.5 7V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7" />

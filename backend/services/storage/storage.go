@@ -70,6 +70,14 @@ func Open(name string) (*os.File, error) {
 	return root.Open(name)
 }
 
+func Remove(name string) error {
+	if err := root.Remove(name); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}
+
 func Prune(dir string, keep map[string]bool) error {
 	entries, err := fs.ReadDir(root.FS(), dir)
 	if errors.Is(err, fs.ErrNotExist) {

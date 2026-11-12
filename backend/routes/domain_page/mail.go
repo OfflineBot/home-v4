@@ -24,6 +24,7 @@ func MailRouter(r fiber.Router) {
 		Get("/folders", mailFolders).
 		Get("/messages", mailMessages).
 		Get("/messages/:id", mailMessage).
+		Post("/messages/read", setMailRead).
 		Get("/attachments/:id", mailAttachment).
 		Get("/contacts", mailContacts).
 		Get("/contacts/directory", directoryLimit(), mailDirectory).
@@ -87,12 +88,37 @@ func mailMessages(c fiber.Ctx) error {
 
 	user := fiber.Locals[*auth.User](c, auth.ContextKey)
 
-	messages, total, err := mail.Messages(user.ID, c.Query("folder", defaultMailFolder), limit, offset)
+	filter := mail.Filter{
+		UnreadOnly:      c.Query("unread") == "true",
+		AttachmentsOnly: c.Query("attachments") == "true",
+		Query:           strings.TrimSpace(c.Query("q")),
+	}
+
+	messages, total, err := mail.Messages(user.ID, c.Query("folder", defaultMailFolder), filter, limit, offset)
 	if err != nil {
 		return mailResult(err)
 	}
 
 	return c.JSON(fiber.Map{"messages": messages, "total": total})
+}
+
+type mailReadInput struct {
+	ID   string `json:"id"`
+	Read bool   `json:"read"`
+}
+
+func setMailRead(c fiber.Ctx) error {
+	var body mailReadInput
+	if err := c.Bind().JSON(&body); err != nil || body.ID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid_body"})
+	}
+
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
+	if err := mail.SetRead(user.ID, body.ID, body.Read); err != nil {
+		return mailResult(err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func mailMessage(c fiber.Ctx) error {

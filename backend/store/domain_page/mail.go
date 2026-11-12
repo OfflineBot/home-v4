@@ -165,19 +165,67 @@ func ReplaceMailFolders(conn *sql.DB, ownerID int64, folders []MailFolder, synce
 	return tx.Commit()
 }
 
-func MailMessages(conn *sql.DB, ownerID int64, folder string, limit, offset int) ([]MailMessage, int, error) {
+type MailFilter struct {
+	UnreadOnly      bool
+	AttachmentsOnly bool
+	Query           string
+}
+
+func (f MailFilter) clause() (string, []any) {
+	where := ""
+	args := []any{}
+
+	if f.UnreadOnly {
+		where += " AND is_read = 0"
+	}
+	if f.AttachmentsOnly {
+		where += " AND has_attachments = 1"
+	}
+	if f.Query != "" {
+		where += " AND (subject LIKE ? ESCAPE '\\' OR sender_name LIKE ? ESCAPE '\\' OR sender_email LIKE ? ESCAPE '\\')"
+		like := "%" + escapeLike(f.Query) + "%"
+		args = append(args, like, like, like)
+	}
+
+	return where, args
+}
+
+func escapeLike(value string) string {
+	for _, char := range []string{"\\", "%", "_"} {
+		value = strings.ReplaceAll(value, char, "\\"+char)
+	}
+	return value
+}
+
+func SetMailRead(conn *sql.DB, ownerID int64, id string, read bool) error {
+	result, err := conn.Exec(
+		"UPDATE mail_messages SET is_read = ? WHERE owner_id = ? AND id = ?",
+		read, ownerID, id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return affectedOne(result)
+}
+
+func MailMessages(conn *sql.DB, ownerID int64, folder string, filter MailFilter, limit, offset int) ([]MailMessage, int, error) {
+	where, args := filter.clause()
+	scope := append([]any{ownerID, folder}, args...)
+
 	var total int
 	err := conn.QueryRow(
-		"SELECT count(*) FROM mail_messages WHERE owner_id = ? AND folder = ?",
-		ownerID, folder,
+		"SELECT count(*) FROM mail_messages WHERE owner_id = ? AND folder = ?"+where,
+		scope...,
 	).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	rows, err := conn.Query(
-		"SELECT "+mailMessageColumns+" FROM mail_messages WHERE owner_id = ? AND folder = ? ORDER BY received DESC LIMIT ? OFFSET ?",
-		ownerID, folder, limit, offset,
+		"SELECT "+mailMessageColumns+" FROM mail_messages WHERE owner_id = ? AND folder = ?"+where+
+			" ORDER BY received DESC LIMIT ? OFFSET ?",
+		append(scope, limit, offset)...,
 	)
 	if err != nil {
 		return nil, 0, err

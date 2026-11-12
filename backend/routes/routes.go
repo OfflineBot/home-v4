@@ -40,6 +40,7 @@ func CollectRoutes(r fiber.Router) {
 	domainpage.GitRouter(r.Group("/git"))
 	domainpage.PagesRouter(r.Group("/pages"))
 	domainpage.NotifyRouter(r.Group("/notifications"))
+	domainpage.PublicStoreRouter(r.Group("/public"))
 	integrationRouter(r.Group("/integration"))
 
 	// the hook carries its key in the URL, so it is rate limited by itself
@@ -59,7 +60,8 @@ const hookRateMax = 60
 
 func bufferBody(c fiber.Ctx) error {
 	req := c.Request()
-	if !req.IsBodyStream() || c.Path() == domainpage.FilesUploadPath {
+	if !req.IsBodyStream() || c.Path() == domainpage.FilesUploadPath ||
+		c.Path() == domainpage.PublicUploadPath {
 		return c.Next()
 	}
 
@@ -76,5 +78,6 @@ func bufferBody(c fiber.Ctx) error {
 }
 
 func isPublicPath(c fiber.Ctx) bool {
-	return slices.Contains(publicPaths, strings.TrimSuffix(c.Path(), "/")) || isIntegrationPath(c)
+	return slices.Contains(publicPaths, strings.TrimSuffix(c.Path(), "/")) ||
+		isIntegrationPath(c) || domainpage.IsPublicStorePath(c)
 }
