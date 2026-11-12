@@ -603,6 +603,19 @@ function webhookNode(responseMode: string): WorkflowNode {
   };
 }
 
+// a time the Wait node will take: its own local clock, never in the past
+function tomorrowAt(hour: number) {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  at.setHours(hour, 0, 0, 0);
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return (
+    `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+    `T${pad(at.getHours())}:${pad(at.getMinutes())}:00`
+  );
+}
+
 export const templates: Template[] = [
   {
     id: "webhook",
@@ -622,6 +635,38 @@ export const templates: Template[] = [
         typeVersion: 1.2,
         position: [0, 0],
         parameters: { rule: { interval: [{ field: "hours", hoursInterval: 1 }] } },
+      },
+    ],
+  },
+  {
+    id: "once-at",
+    title: "Once at a set time",
+    description:
+      "Press Run, it waits until the time in the Wait step and then sends one notification. Once, not every day - set to tomorrow 18:00 to start with.",
+    build: () => [
+      webhookNode("onReceived"),
+      {
+        id: newId(),
+        name: "Wait until",
+        type: "n8n-nodes-base.wait",
+        typeVersion: 1.1,
+        position: [260, 0],
+        parameters: {
+          resume: "specificTime",
+          dateTime: tomorrowAt(18),
+        },
+      },
+      {
+        id: newId(),
+        name: "Notify",
+        type: "CUSTOM.homeV4Notify",
+        typeVersion: 1,
+        position: [520, 0],
+        parameters: {
+          title: "Reminder",
+          message: "The time you set has come.",
+          link: "",
+        },
       },
     ],
   },
