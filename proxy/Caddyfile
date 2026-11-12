@@ -8,7 +8,7 @@
 }
 
 (app) {
-	handle /api/machine/terminals/connect {
+	handle /api/* {
 		reverse_proxy backend:8080
 	}
 
