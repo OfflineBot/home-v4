@@ -590,11 +590,11 @@ export type Template = {
   build: () => WorkflowNode[];
 };
 
-function webhookNode(responseMode: string): WorkflowNode {
+function webhookNode(responseMode: string, name = "Webhook"): WorkflowNode {
   const id = newId();
   return {
     id: newId(),
-    name: "Webhook",
+    name,
     type: webhookType,
     typeVersion: 2,
     position: [0, 0],
@@ -642,9 +642,9 @@ export const templates: Template[] = [
     id: "once-at",
     title: "Once at a set time",
     description:
-      "Press Run, it waits until the time in the Wait step and then sends one notification. Once, not every day - set to tomorrow 18:00 to start with.",
+      "Set date and time in the second step, Wait until, then press Run once. It sleeps until that moment and sends one notification - not every day.",
     build: () => [
-      webhookNode("onReceived"),
+      webhookNode("onReceived", "Start"),
       {
         id: newId(),
         name: "Wait until",
