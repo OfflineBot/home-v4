@@ -8,8 +8,11 @@ import (
 
 	"home-v4/backend/services/domain_page/automation"
 	"home-v4/backend/services/domain_page/calendar"
+	"home-v4/backend/services/domain_page/grades"
 	"home-v4/backend/services/domain_page/lights"
 	"home-v4/backend/services/domain_page/machine"
+	"home-v4/backend/services/domain_page/mail"
+	"home-v4/backend/services/domain_page/notify"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
@@ -44,7 +47,10 @@ func integrationRouter(r fiber.Router) {
 		Get("/lights", integrationLights).
 		Get("/lights/:id/state", integrationLightState).
 		Post("/lights/:id/state", integrationSetLight).
-		Get("/lights/:id/presets", integrationPresets)
+		Get("/lights/:id/presets", integrationPresets).
+		Get("/grades", integrationGrades).
+		Get("/mail/recent", integrationMail).
+		Post("/notify", integrationNotify)
 }
 
 func isIntegrationPath(c fiber.Ctx) bool {
@@ -244,4 +250,51 @@ func integrationPresets(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"presets": presets})
+}
+
+// integrationGrades feeds the grade trigger: every module, graded or not, so
+// the node can tell which ones are new since it last looked.
+func integrationGrades(c fiber.Ctx) error {
+	list, err := grades.ByUser(integrationUser(c))
+	if err != nil {
+		return integrationResult(c, err)
+	}
+
+	return c.JSON(fiber.Map{"grades": list, "semesters": grades.Semesters(list)})
+}
+
+func integrationMail(c fiber.Ctx) error {
+	messages, total, err := mail.Messages(
+		integrationUser(c),
+		c.Query("folder", "inbox"),
+		fiber.Query(c, "limit", 25),
+		0,
+	)
+	// a trigger may poll long before the mailbox is connected
+	if errors.Is(err, mail.ErrUnknownFolder) {
+		return c.JSON(fiber.Map{"messages": []any{}, "total": 0})
+	}
+	if err != nil {
+		return integrationResult(c, err)
+	}
+
+	return c.JSON(fiber.Map{"messages": messages, "total": total})
+}
+
+func integrationNotify(c fiber.Ctx) error {
+	var body notify.Message
+	if err := c.Bind().JSON(&body); err != nil {
+		return integrationError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	body.Source = "n8n"
+	message, err := notify.Send(integrationUser(c), body)
+	if err != nil {
+		if errors.Is(err, notify.ErrInvalidMessage) {
+			return integrationError(c, fiber.StatusBadRequest, "title_required")
+		}
+		return integrationError(c, fiber.StatusInternalServerError, "internal")
+	}
+
+	return c.JSON(fiber.Map{"sent": true, "id": message.ID})
 }

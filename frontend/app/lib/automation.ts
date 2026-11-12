@@ -663,6 +663,38 @@ export const templates: Template[] = [
     ],
   },
   {
+    id: "grade-notify",
+    title: "A grade lands on your phone",
+    description:
+      "When Dualis has a new grade, send it to the app. Edit the title and the text to taste.",
+    build: () => [
+      {
+        id: newId(),
+        name: "New grade",
+        type: "CUSTOM.homeV4GradeTrigger",
+        typeVersion: 1,
+        position: [0, 0],
+        parameters: {
+          pollTimes: { item: [{ mode: "everyHour", minute: 5 }] },
+          moment: "graded",
+          semester: "",
+        },
+      },
+      {
+        id: newId(),
+        name: "Notify",
+        type: "CUSTOM.homeV4Notify",
+        typeVersion: 1,
+        position: [260, 0],
+        parameters: {
+          title: "=New grade: {{ $json.name }}",
+          message: "={{ $json.grade }} · {{ $json.ects }} ECTS · {{ $json.semester }}",
+          link: "/grades",
+        },
+      },
+    ],
+  },
+  {
     id: "empty",
     title: "Empty",
     description: "Pick the trigger yourself.",

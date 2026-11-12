@@ -15,6 +15,7 @@ import (
 	"home-v4/backend/services/domain_page/machine"
 	"home-v4/backend/services/domain_page/mail"
 	"home-v4/backend/services/domain_page/moodle"
+	"home-v4/backend/services/domain_page/notify"
 	"home-v4/backend/services/domain_page/pages"
 	"home-v4/backend/services/storage"
 	"home-v4/backend/services/syncer"
@@ -34,6 +35,7 @@ func Setup() error {
 	db.AddSchema("git/schema.sql", git.Schema)
 	db.AddSchema("files/schema.sql", files.Schema)
 	db.AddSchema("pages/schema.sql", pages.Schema)
+	db.AddSchema("notify/schema.sql", notify.Schema)
 
 	if err := db.Setup(); err != nil {
 		return fmt.Errorf("Database setup failed with error: %w", err)

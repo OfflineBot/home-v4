@@ -5,8 +5,10 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/skip"
 )
 
@@ -15,6 +17,7 @@ var publicPaths = []string{
 	"/api/auth/login",
 	"/api/auth/register",
 	domainpage.TerminalConnectPath,
+	domainpage.NotifyHookPath,
 }
 
 // / collects all routs from the router and groups them
@@ -36,8 +39,23 @@ func CollectRoutes(r fiber.Router) {
 	domainpage.FilesRouter(r.Group("/files"))
 	domainpage.GitRouter(r.Group("/git"))
 	domainpage.PagesRouter(r.Group("/pages"))
+	domainpage.NotifyRouter(r.Group("/notifications"))
 	integrationRouter(r.Group("/integration"))
+
+	// the hook carries its key in the URL, so it is rate limited by itself
+	r.Add([]string{fiber.MethodGet, fiber.MethodPost}, "/notify-me", domainpage.NotifyHook, limiter.New(limiter.Config{
+		Max:        hookRateMax,
+		Expiration: time.Minute,
+		KeyGenerator: func(c fiber.Ctx) string {
+			return c.IP() + ":" + c.Query("key")
+		},
+		LimitReached: func(c fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too_many_requests"})
+		},
+	}))
 }
+
+const hookRateMax = 60
 
 func bufferBody(c fiber.Ctx) error {
 	req := c.Request()

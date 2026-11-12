@@ -130,6 +130,60 @@ request, so the client has to sign in again. Two factor stays as it was. `passwo
 and `newPasswordHash` are both client hashes; the salt is the name, so it does not
 change when the password does.
 
+## Notifications
+
+One table of messages per user and one open connection per phone. Nothing is pushed
+through Google: `GET /api/notifications/stream` is an SSE stream the Android app holds
+open from a foreground service, and a message written by anything else is handed to
+every stream of that user at once. The stream sends `: ping` every 25 seconds, so a
+client that sees nothing for longer knows the line is dead and reconnects. A phone that
+was offline catches up over `/api/notifications/list`, which is why every message is
+stored, capped at the newest 200 per user.
+
+Three things write a notification:
+
+- n8n, with `POST /api/integration/notify` and the automation token it already has.
+  The `Home: Notification` node fills `title`, `body` and `link` from the workflow, so
+  the text is written in n8n, not here.
+- Any script, with `GET|POST /api/notify-me`. This is the only route outside
+  `/api/health` and `/api/auth/*` that has no session, so it carries its own key:
+  `notify_settings.hook_key`, 16 random bytes as hex, unique per user, swappable from
+  the app and worthless while `hook_enabled` is 0. `user` is checked against the key's
+  owner when it is given, so a URL reads as what it does. An unknown key, a disabled
+  hook and a mismatched name all answer `404`, and the route is rate limited to 60 a
+  minute per IP and key.
+- The app itself, with `POST /api/notifications/test`.
+
+| Method and path | Needs | Body or query | Answers |
+| --- | --- | --- | --- |
+| `GET /api/notifications/list` | session | `limit` | `200` `{notifications, unread}` |
+| `GET /api/notifications/stream` | session | - | `200` `text/event-stream` |
+| `POST /api/notifications/read` | session | `id` | `204` |
+| `POST /api/notifications/read-all` | session | - | `204` |
+| `POST /api/notifications/delete` | session | `id` | `204` |
+| `POST /api/notifications/clear` | session | - | `204` |
+| `GET /api/notifications/settings` | session | - | `200` `{hook_enabled, hook_key}` |
+| `POST /api/notifications/settings` | session | `hook_enabled` | `200` settings |
+| `POST /api/notifications/settings/key` | session | - | `200` settings, old URLs dead |
+| `POST /api/notifications/test` | session | - | `200` the message |
+| `POST /api/integration/notify` | n8n token | `title`, `body`, `link` | `200` `{sent, id}` |
+| `GET|POST /api/notify-me` | hook key | `key`, `user`, `title`, `message`, `link` | `200` `{sent, id}`, `404`, `429` |
+
+	curl "https://home.example/api/notify-me?user=name&key=KEY&title=Backup&message=done"
+
+Titles are cut at 120 characters, bodies at 1000, links at 200, and a message without a
+title is `400`. The key is minted the first time the settings are read, not at sign up,
+so an account that never opens the app never has one.
+
+## Integration
+
+`/api/integration/*` is what n8n talks to, with the token from the home credential
+rather than a session. Besides the calendar, machine and light routes it answers
+`GET /grades` and `GET /mail/recent` for the two polling triggers: the nodes keep the
+state of what they have already seen themselves, so these stay plain reads. A mailbox
+that is not connected yet answers an empty list instead of an error, because a trigger
+starts polling long before that.
+
 ## Environment
 
 | Variable | Used for |
