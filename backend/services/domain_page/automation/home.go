@@ -37,6 +37,8 @@ const (
 	defaultBackendURL  = "http://backend:8080"
 	homeTokenPrefix    = "hv4_"
 	homeTokenBytes     = 32
+	allLights          = "all"
+	allLightsName      = "All Lights"
 )
 
 var (
@@ -79,6 +81,13 @@ func HomeOptions(userID int64, method string, params map[string]string) ([]Optio
 		list, err := lights.List(userID)
 		if err != nil {
 			return nil, err
+		}
+		if len(list) > 1 {
+			options = append(options, Option{
+				Name:        allLightsName,
+				Value:       allLights,
+				Description: strconv.Itoa(len(list)) + " lights at once",
+			})
 		}
 		for _, l := range list {
 			options = append(options, Option{Name: l.Name, Value: l.ID})
