@@ -1,17 +1,35 @@
 import { useId } from "react";
 import { Icon } from "../icons";
 import { inputClass, primaryButtonClass } from "../setting-row";
+import type { TmuxSession } from "../../lib/terminal";
 
 type SessionListProps = {
   recent: string[];
+  live: TmuxSession[];
+  hasTmux: boolean;
   open: string[];
   onOpen: (name: string) => void;
   onCreate: () => void;
   onForget: (name: string) => void;
 };
 
-export function SessionList({ recent, open, onOpen, onCreate, onForget }: SessionListProps) {
+function windowLabel(session: TmuxSession) {
+  const windows = session.windows === 1 ? "1 window" : `${session.windows} windows`;
+  return session.attached ? `${windows} · attached` : windows;
+}
+
+export function SessionList({
+  recent,
+  live,
+  hasTmux,
+  open,
+  onOpen,
+  onCreate,
+  onForget,
+}: SessionListProps) {
   const inputId = useId();
+  const running = new Set(live.map((session) => session.name));
+  const forgotten = recent.filter((name) => !running.has(name));
 
   return (
     <div className="flex flex-col gap-1">
@@ -49,14 +67,60 @@ export function SessionList({ recent, open, onOpen, onCreate, onForget }: Sessio
         </div>
       </form>
 
-      {recent.length > 0 && (
+      <div className="border-t border-ui-border-soft" />
+      <p className="px-2 pt-1 text-xs font-medium tracking-wide text-ui-fg-faint uppercase">
+        On the machine
+      </p>
+      {!hasTmux ? (
+        <p className="px-2 pt-0.5 pb-1 text-xs text-ui-fg-muted">
+          No tmux there, so nothing survives a closed tab.
+        </p>
+      ) : live.length === 0 ? (
+        <p className="px-2 pt-0.5 pb-1 text-xs text-ui-fg-muted">
+          None running. Connect once to see what tmux has.
+        </p>
+      ) : (
+        <ul className="flex max-h-64 flex-col overflow-y-auto">
+          {live.map((session) => (
+            <li key={session.name}>
+              <button
+                type="button"
+                onClick={() => onOpen(session.name)}
+                className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left outline-none hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring"
+              >
+                <span
+                  className={`size-1.5 shrink-0 rounded-full ${
+                    open.includes(session.name)
+                      ? "bg-[var(--accent)]"
+                      : session.attached
+                        ? "bg-ctp-green"
+                        : "bg-ui-border-strong"
+                  }`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-[13px] text-ui-fg">
+                    {session.name}
+                  </span>
+                  {session.windows > 0 && (
+                    <span className="block truncate text-xs text-ui-fg-muted">
+                      {windowLabel(session)}
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {forgotten.length > 0 && (
         <>
           <div className="border-t border-ui-border-soft" />
           <p className="px-2 pt-1 text-xs font-medium tracking-wide text-ui-fg-faint uppercase">
             Recent
           </p>
           <ul className="flex max-h-64 flex-col overflow-y-auto">
-            {recent.map((name) => (
+            {forgotten.map((name) => (
               <li key={name} className="group flex items-center gap-1 rounded-md hover:bg-ui-hover">
                 <button
                   type="button"

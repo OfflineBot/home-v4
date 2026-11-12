@@ -22,18 +22,35 @@ export type LinkStatus =
   | { phase: "ready" }
   | { phase: "closed"; error: string | null; code: string | null; hostKey?: HostKeyInfo };
 
+/// What tmux on the machine says it is running, not what this browser
+/// happens to remember.
+export type TmuxSession = {
+  name: string;
+  windows: number;
+  attached: boolean;
+  created: number;
+  activity: number;
+};
+
+export type TmuxState = {
+  installed: boolean;
+  sessions: TmuxSession[];
+};
+
 export type TerminalHandlers = {
   data: (data: Uint8Array | string) => void;
   status: (status: LinkStatus) => void;
   exit: (code: number | null) => void;
   prompt: (prompt: LoginPrompt) => Promise<string[] | null>;
   hostKey: (key: HostKeyInfo) => Promise<boolean>;
+  tmux?: (state: TmuxState) => void;
 };
 
 export type TerminalLink = {
   send: (data: string) => void;
   sendBinary: (data: string) => void;
   resize: (size: TerminalSize) => void;
+  listSessions: () => void;
   close: () => void;
 };
 
@@ -100,6 +117,29 @@ function storeRecent(machine: Machine, names: string[]) {
 export function rememberSession(machine: Machine, name: string) {
   const names = recentSessions(machine).filter((entry) => entry !== name);
   storeRecent(machine, [name, ...names]);
+}
+
+export function liveSessions(machine: Machine): string[] {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(liveKey(machine)) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function storeLive(machine: Machine, names: string[]) {
+  try {
+    window.localStorage.setItem(liveKey(machine), JSON.stringify(names.slice(0, 50)));
+  } catch {
+    return;
+  }
+}
+
+function liveKey(machine: Machine) {
+  return `machine:${machine.id}:live`;
 }
 
 export function forgetSession(machine: Machine, name: string) {
@@ -216,6 +256,20 @@ export function openTerminal(
         fallbackTimer = window.setTimeout(startTmux, promptWaitMs);
         scheduleTmux();
         return;
+      case "tmux": {
+        const raw = Array.isArray(message.sessions) ? message.sessions : [];
+        handlers.tmux?.({
+          installed: message.tmux !== "missing",
+          sessions: raw.map((entry: Record<string, unknown>) => ({
+            name: String(entry?.name ?? ""),
+            windows: Number(entry?.windows) || 0,
+            attached: Boolean(entry?.attached),
+            created: Number(entry?.created) || 0,
+            activity: Number(entry?.activity) || 0,
+          })),
+        });
+        return;
+      }
       case "exit":
         finished = true;
         handlers.exit(typeof message.code === "number" ? message.code : null);
@@ -283,6 +337,9 @@ export function openTerminal(
     resize(size) {
       current = size;
       control({ type: "resize", ...size });
+    },
+    listSessions() {
+      control({ type: "tmux" });
     },
     close() {
       closed = true;

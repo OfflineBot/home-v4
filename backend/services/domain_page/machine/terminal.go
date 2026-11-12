@@ -66,6 +66,15 @@ const (
 	authFailures    = "too many authentication failures"
 	DefaultCols     = 80
 	DefaultRows     = 24
+
+	maxTmuxList     = 50
+	tmuxSettle      = 2 * time.Second
+	maxSessionName  = 64
+	tmuxMissingCode = 7
+	tmuxListCommand = "command -v tmux >/dev/null 2>&1 || exit 7; " +
+		"tmux list-sessions -F " +
+		"'#{session_name}\t#{session_windows}\t#{session_attached}" +
+		"\t#{session_created}\t#{session_activity}' 2>/dev/null; exit 0"
 )
 
 var normalClosure = []byte{0x03, 0xe8}
@@ -100,6 +109,14 @@ type prompt struct {
 	Echo bool   `json:"echo"`
 }
 
+type TmuxSession struct {
+	Name     string `json:"name"`
+	Windows  int    `json:"windows"`
+	Attached bool   `json:"attached"`
+	Created  int64  `json:"created"`
+	Activity int64  `json:"activity"`
+}
+
 type event struct {
 	Type        string   `json:"type"`
 	Error       string   `json:"error,omitempty"`
@@ -112,6 +129,9 @@ type event struct {
 	Fingerprint string   `json:"fingerprint,omitempty"`
 	Expected    string   `json:"expected,omitempty"`
 	Code        *int     `json:"code,omitempty"`
+
+	Tmux     string        `json:"tmux,omitempty"`
+	Sessions []TmuxSession `json:"sessions,omitempty"`
 }
 
 type control struct {
@@ -327,6 +347,8 @@ func (t *terminal) shell(client *ssh.Client) error {
 	stopPing := make(chan struct{})
 	defer close(stopPing)
 	go t.keepAlive(stopPing)
+	go t.watchControls(client, stopPing)
+	go t.pollSessions(client)
 
 	var pumps sync.WaitGroup
 	pumps.Add(2)
@@ -507,6 +529,82 @@ func (t *terminal) pump(r io.Reader, wg *sync.WaitGroup) {
 			return
 		}
 	}
+}
+
+func (t *terminal) watchControls(client *ssh.Client, stop chan struct{}) {
+	for {
+		select {
+		case msg := <-t.controls:
+			if msg.Type == "tmux" {
+				t.listSessions(client)
+			}
+		case <-stop:
+			return
+		case <-t.done:
+			return
+		}
+	}
+}
+
+func (t *terminal) pollSessions(client *ssh.Client) {
+	t.listSessions(client)
+
+	select {
+	case <-time.After(tmuxSettle):
+	case <-t.done:
+		return
+	}
+
+	t.listSessions(client)
+}
+
+func (t *terminal) listSessions(client *ssh.Client) {
+	session, err := client.NewSession()
+	if err != nil {
+		return
+	}
+	defer session.Close()
+
+	out, err := session.Output(tmuxListCommand)
+
+	var exit *ssh.ExitError
+	if errors.As(err, &exit) && exit.ExitStatus() == tmuxMissingCode {
+		t.send(event{Type: "tmux", Tmux: "missing"})
+		return
+	}
+	if err != nil {
+		return
+	}
+
+	t.send(event{Type: "tmux", Tmux: "ok", Sessions: parseSessions(string(out))})
+}
+
+func parseSessions(out string) []TmuxSession {
+	list := []TmuxSession{}
+
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
+		if len(fields) < 5 || fields[0] == "" || len(fields[0]) > maxSessionName {
+			continue
+		}
+
+		windows, _ := strconv.Atoi(fields[1])
+		created, _ := strconv.ParseInt(fields[3], 10, 64)
+		activity, _ := strconv.ParseInt(fields[4], 10, 64)
+
+		list = append(list, TmuxSession{
+			Name:     fields[0],
+			Windows:  windows,
+			Attached: fields[2] != "0",
+			Created:  created,
+			Activity: activity,
+		})
+		if len(list) >= maxTmuxList {
+			break
+		}
+	}
+
+	return list
 }
 
 func (t *terminal) keepAlive(stop chan struct{}) {

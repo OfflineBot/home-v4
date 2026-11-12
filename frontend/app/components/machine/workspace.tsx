@@ -10,15 +10,19 @@ import { TerminalView, type TerminalSink } from "./terminal-view";
 import type { Machine } from "../../lib/machine";
 import {
   forgetSession,
+  liveSessions,
   nextSessionName,
   openTerminal,
   recentSessions,
   rememberSession,
   sessionNameError,
+  storeLive,
   type HostKeyInfo,
   type LinkStatus,
   type LoginPrompt,
+  type TerminalLink,
   type TerminalSize,
+  type TmuxSession,
 } from "../../lib/terminal";
 
 type Tab = {
@@ -110,11 +114,14 @@ function statusDot(tab: Tab, active: boolean) {
 export function TerminalWorkspace({ machine }: { machine: Machine }) {
   const root = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const links = useRef(new Map<string, TerminalLink>());
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [closing, setClosing] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const [live, setLive] = useState<TmuxSession[]>([]);
+  const [hasTmux, setHasTmux] = useState(true);
   const [menu, setMenu] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [failure, setFailure] = useState({ message: "", attempt: 0 });
@@ -138,6 +145,13 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
     setTabs(restored);
     setActive(restored[activeIndex]?.id ?? null);
     setRecent(known);
+    setLive(liveSessions(machine).map((name) => ({
+      name,
+      windows: 0,
+      attached: false,
+      created: 0,
+      activity: 0,
+    })));
     setReady(true);
   }, [machine]);
 
@@ -263,8 +277,8 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
   }
 
   function connectFor(tab: Tab) {
-    return (size: TerminalSize, sink: TerminalSink) =>
-      openTerminal(machine, tab.session, size, {
+    return (size: TerminalSize, sink: TerminalSink) => {
+      const link = openTerminal(machine, tab.session, size, {
         ...sink,
         prompt: (prompt) =>
           new Promise((resolve) => {
@@ -280,7 +294,17 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
             askCounter += 1;
             setHostKeys((current) => [...current, { id: askCounter, tab: tab.id, key, resolve }]);
           }),
+        // what the machine itself reports, which beats what we remembered
+        tmux: (state) => {
+          setHasTmux(state.installed);
+          setLive(state.sessions);
+          storeLive(machine, state.sessions.map((entry) => entry.name));
+        },
       });
+
+      links.current.set(tab.id, link);
+      return link;
+    };
   }
 
   function answerPrompt(answers: string[] | null) {
@@ -349,7 +373,10 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
           <button
             type="button"
             onClick={() => {
-              if (!menu) setRecent(recentSessions(machine));
+              if (!menu) {
+                setRecent(recentSessions(machine));
+                if (active) links.current.get(active)?.listSessions();
+              }
               setMenu(!menu);
             }}
             aria-label="Sessions"
@@ -366,6 +393,8 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
             >
               <SessionList
                 recent={recent}
+                live={live}
+                hasTmux={hasTmux}
                 open={openNames}
                 onOpen={open}
                 onCreate={create}
@@ -427,6 +456,8 @@ export function TerminalWorkspace({ machine }: { machine: Machine }) {
             <div className="w-80 rounded-lg border border-ui-border bg-ui-raised p-1">
               <SessionList
                 recent={recent}
+                live={live}
+                hasTmux={hasTmux}
                 open={openNames}
                 onOpen={open}
                 onCreate={create}
