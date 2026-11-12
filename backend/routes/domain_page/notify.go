@@ -208,20 +208,15 @@ func NotifyHook(c fiber.Ctx) error {
 		_ = c.Bind().JSON(&body)
 	}
 
-	key := firstFilled(c.Query("key"), c.Get("X-Notify-Key"))
-	userID, err := notify.UserByHookKey(key)
+	userID, err := hookTarget(
+		firstFilled(c.Query("user"), c.Query("name"), body.User),
+		firstFilled(c.Query("key"), c.Get("X-Notify-Key")),
+	)
 	if err != nil {
 		if errors.Is(err, notify.ErrNotFound) || errors.Is(err, notify.ErrHookDisabled) {
 			return notifyError(c, fiber.StatusNotFound, "not_found")
 		}
 		return notifyError(c, fiber.StatusInternalServerError, "internal")
-	}
-
-	if name := firstFilled(c.Query("user"), c.Query("name"), body.User); name != "" {
-		owner, err := auth.FindUser(name)
-		if err != nil || owner == nil || owner.ID != userID {
-			return notifyError(c, fiber.StatusNotFound, "not_found")
-		}
 	}
 
 	message := notify.Message{
@@ -240,6 +235,41 @@ func NotifyHook(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"sent": true, "id": sent.ID})
+}
+
+func hookTarget(name, key string) (int64, error) {
+	if key != "" {
+		userID, err := notify.UserByHookKey(key)
+		if err != nil || name == "" {
+			return userID, err
+		}
+
+		owner, err := auth.FindUser(name)
+		if err != nil || owner == nil || owner.ID != userID {
+			return 0, notify.ErrNotFound
+		}
+
+		return userID, nil
+	}
+
+	if name == "" {
+		return 0, notify.ErrNotFound
+	}
+
+	owner, err := auth.FindUser(name)
+	if err != nil || owner == nil {
+		return 0, notify.ErrNotFound
+	}
+
+	enabled, err := notify.HookEnabled(owner.ID)
+	if err != nil {
+		return 0, err
+	}
+	if !enabled {
+		return 0, notify.ErrHookDisabled
+	}
+
+	return owner.ID, nil
 }
 
 func firstFilled(values ...string) string {

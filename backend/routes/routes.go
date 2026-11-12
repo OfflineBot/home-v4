@@ -44,16 +44,16 @@ func CollectRoutes(r fiber.Router) {
 	integrationRouter(r.Group("/integration"))
 
 	// the hook carries its key in the URL, so it is rate limited by itself
-	r.Add([]string{fiber.MethodGet, fiber.MethodPost}, "/notify-me", domainpage.NotifyHook, limiter.New(limiter.Config{
+	r.Add([]string{fiber.MethodGet, fiber.MethodPost}, "/notify-me", limiter.New(limiter.Config{
 		Max:        hookRateMax,
 		Expiration: time.Minute,
 		KeyGenerator: func(c fiber.Ctx) string {
-			return c.IP() + ":" + c.Query("key")
+			return c.IP() + ":" + c.Query("user")
 		},
 		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too_many_requests"})
 		},
-	}))
+	}), domainpage.NotifyHook)
 }
 
 const hookRateMax = 60

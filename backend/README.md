@@ -146,12 +146,12 @@ Three things write a notification:
   The `Home: Notification` node fills `title`, `body` and `link` from the workflow, so
   the text is written in n8n, not here.
 - Any script, with `GET|POST /api/notify-me`. This is the only route outside
-  `/api/health` and `/api/auth/*` that has no session, so it carries its own key:
-  `notify_settings.hook_key`, 16 random bytes as hex, unique per user, swappable from
-  the app and worthless while `hook_enabled` is 0. `user` is checked against the key's
-  owner when it is given, so a URL reads as what it does. An unknown key, a disabled
-  hook and a mismatched name all answer `404`, and the route is rate limited to 60 a
-  minute per IP and key.
+  `/api/health` and `/api/auth/*` that has no session and no credential either: the
+  account name picks the recipient and `notify_settings.hook_enabled` is the whole of
+  the access control, deliberately, so the line can be pasted into anything. Switched
+  off it answers `404`, exactly like an unknown name, and the route is rate limited to
+  60 a minute per IP and name. `notify_settings.hook_key` still works in place of the
+  name for URLs handed out earlier, and is checked against `user` when both are given.
 - The app itself, with `POST /api/notifications/test`.
 
 | Method and path | Needs | Body or query | Answers |
@@ -167,13 +167,12 @@ Three things write a notification:
 | `POST /api/notifications/settings/key` | session | - | `200` settings, old URLs dead |
 | `POST /api/notifications/test` | session | - | `200` the message |
 | `POST /api/integration/notify` | n8n token | `title`, `body`, `link` | `200` `{sent, id}` |
-| `GET|POST /api/notify-me` | hook key | `key`, `user`, `title`, `message`, `link` | `200` `{sent, id}`, `404`, `429` |
+| `GET|POST /api/notify-me` | the switch | `user`, `title`, `message`, `link`, optional `key` | `200` `{sent, id}`, `404`, `429` |
 
-	curl "https://home.example/api/notify-me?user=name&key=KEY&title=Backup&message=done"
+	curl "https://home.example/api/notify-me?user=name&title=Backup&message=done"
 
 Titles are cut at 120 characters, bodies at 1000, links at 200, and a message without a
-title is `400`. The key is minted the first time the settings are read, not at sign up,
-so an account that never opens the app never has one.
+title is `400`.
 
 ## Integration
 

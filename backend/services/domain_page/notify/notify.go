@@ -267,6 +267,20 @@ func RotateKey(userID int64) (string, error) {
 	return key, nil
 }
 
+func HookEnabled(userID int64) (bool, error) {
+	var enabled bool
+
+	err := db.DB.QueryRow(
+		"SELECT hook_enabled FROM notify_settings WHERE user_id = ?", userID,
+	).Scan(&enabled)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	return enabled, err
+}
+
 func UserByHookKey(key string) (int64, error) {
 	key = strings.TrimSpace(key)
 	if len(key) != 32 {
