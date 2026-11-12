@@ -1,4 +1,4 @@
-const { call, listLights, listPresets } = require("../../shared/home");
+const { allLights, call, lightIDs, listLights, listPresets } = require("../../shared/home");
 
 class HomeV4Lights {
   constructor() {
@@ -38,7 +38,7 @@ class HomeV4Lights {
           typeOptions: { loadOptionsMethod: "getLights" },
           default: "",
           required: true,
-          description: "Lights are managed under Settings → Connections",
+          description: "One light, or all of them at once. Lights are managed under Settings → Connections",
         },
         {
           displayName: "Brightness (%)",
@@ -62,7 +62,17 @@ class HomeV4Lights {
           typeOptions: { loadOptionsMethod: "getPresets", loadOptionsDependsOn: ["light"] },
           default: "",
           required: true,
-          displayOptions: { show: { operation: ["preset"] } },
+          displayOptions: { show: { operation: ["preset"] }, hide: { light: [allLights] } },
+        },
+        {
+          displayName: "Preset Number",
+          name: "presetNumber",
+          type: "number",
+          typeOptions: { minValue: 1 },
+          default: 1,
+          required: true,
+          description: "Presets are stored per device, so with every light the number is used as it is",
+          displayOptions: { show: { operation: ["preset"], light: [allLights] } },
         },
       ],
     };
@@ -76,13 +86,8 @@ class HomeV4Lights {
 
     for (let index = 0; index < items.length; index++) {
       const operation = this.getNodeParameter("operation", index);
-      const id = encodeURIComponent(this.getNodeParameter("light", index));
-      const path = `/api/integration/lights/${id}/state`;
-
-      if (operation === "state") {
-        results.push({ json: await call(this, "GET", path), pairedItem: { item: index } });
-        continue;
-      }
+      const choice = String(this.getNodeParameter("light", index));
+      const targets = choice === allLights ? await lightIDs(this) : [choice];
 
       const body = {};
       if (operation === "on") body.on = true;
@@ -95,9 +100,26 @@ class HomeV4Lights {
       if (operation === "on" || operation === "brightness" || operation === "color") {
         body.brightness = this.getNodeParameter("brightness", index);
       }
-      if (operation === "preset") body.preset = Number(this.getNodeParameter("preset", index));
+      if (operation === "preset") {
+        const field = choice === allLights ? "presetNumber" : "preset";
+        body.preset = Number(this.getNodeParameter(field, index));
+      }
 
-      results.push({ json: await call(this, "POST", path, { body }), pairedItem: { item: index } });
+      // one light that is unplugged must not swallow the rest
+      for (const target of targets) {
+        const path = `/api/integration/lights/${encodeURIComponent(target)}/state`;
+        const pairedItem = { item: index };
+
+        try {
+          const json = operation === "state"
+            ? await call(this, "GET", path)
+            : await call(this, "POST", path, { body });
+          results.push({ json, pairedItem });
+        } catch (error) {
+          if (choice !== allLights) throw error;
+          results.push({ json: { id: target, error: String(error.message || error) }, pairedItem });
+        }
+      }
     }
 
     return [results];

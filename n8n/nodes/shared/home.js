@@ -29,18 +29,32 @@ async function listMachines() {
   }));
 }
 
+const allLights = "all";
+
+async function lightIDs(context) {
+  const data = await call(context, "GET", "/api/integration/lights");
+  return (data.lights || []).map((light) => light.id);
+}
+
 async function listLights() {
   const data = await call(this, "GET", "/api/integration/lights");
-  return (data.lights || []).map((light) => ({
+  const lights = (data.lights || []).map((light) => ({
     name: light.name,
     value: light.id,
     description: light.url || light.ip,
   }));
+
+  if (lights.length < 2) return lights;
+
+  return [
+    { name: "All Lights", value: allLights, description: `Every light at once (${lights.length})` },
+    ...lights,
+  ];
 }
 
 async function listPresets() {
   const light = this.getCurrentNodeParameter("light");
-  if (!light) return [];
+  if (!light || light === allLights) return [];
 
   const data = await call(this, "GET", `/api/integration/lights/${encodeURIComponent(light)}/presets`);
   return (data.presets || []).map((preset) => ({ name: preset.name, value: preset.id }));
@@ -53,4 +67,13 @@ function dayQuery(context, index) {
   return day;
 }
 
-module.exports = { call, sourceOptions, listMachines, listLights, listPresets, dayQuery };
+module.exports = {
+  call,
+  sourceOptions,
+  listMachines,
+  listLights,
+  listPresets,
+  lightIDs,
+  allLights,
+  dayQuery,
+};
