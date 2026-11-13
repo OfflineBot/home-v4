@@ -88,6 +88,7 @@ const errorMessages: Record<string, string> = {
   invalid_change: "This change is not possible.",
   duplicate: "This name or address is already used.",
   not_wled: "No WLED device answers at this address.",
+  not_shelly: "No Shelly device answers at this address.",
   unreachable: "The light is not reachable.",
   not_found: "This light no longer exists.",
   preset_not_found: "This preset no longer exists.",
@@ -106,7 +107,10 @@ export function isColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 }
 
-export function mergeChange(pending: LightChange | null, change: LightChange): LightChange {
+export function mergeChange(
+  pending: LightChange | null,
+  change: LightChange,
+): LightChange {
   const next: LightChange = { ...pending };
 
   if (change.preset !== undefined) {
@@ -124,12 +128,16 @@ export function mergeChange(pending: LightChange | null, change: LightChange): L
   ) {
     delete next.preset;
   }
-  if (change.color !== undefined && change.effect === undefined) delete next.effect;
+  if (change.color !== undefined && change.effect === undefined)
+    delete next.effect;
 
   return { ...next, ...change };
 }
 
-export function applyChange(state: LightState, change: LightChange): LightState {
+export function applyChange(
+  state: LightState,
+  change: LightChange,
+): LightState {
   const next = { ...state };
 
   if (change.on !== undefined) next.on = change.on;
@@ -144,7 +152,10 @@ export function applyChange(state: LightState, change: LightChange): LightState 
   if (change.intensity !== undefined) next.intensity = change.intensity;
   if (change.palette !== undefined) next.palette = change.palette;
   if (change.preset !== undefined) next.preset = change.preset;
-  else if (Object.keys(change).some((key) => key !== "on" && key !== "brightness")) next.preset = -1;
+  else if (
+    Object.keys(change).some((key) => key !== "on" && key !== "brightness")
+  )
+    next.preset = -1;
 
   return next;
 }
@@ -171,14 +182,20 @@ export function groupChange(
   const mapped: LightChange = { ...change };
 
   if (change.effect !== undefined) {
-    const name = shared.effects.find((option) => option.id === change.effect)?.name;
+    const name = shared.effects.find(
+      (option) => option.id === change.effect,
+    )?.name;
     const id =
-      change.effect === solidEffect ? solidEffect : optionId(device?.effects ?? [], name);
+      change.effect === solidEffect
+        ? solidEffect
+        : optionId(device?.effects ?? [], name);
     if (id === undefined) delete mapped.effect;
     else mapped.effect = id;
   }
   if (change.palette !== undefined) {
-    const name = shared.palettes.find((option) => option.id === change.palette)?.name;
+    const name = shared.palettes.find(
+      (option) => option.id === change.palette,
+    )?.name;
     const id = optionId(device?.palettes ?? [], name);
     if (id === undefined) delete mapped.palette;
     else mapped.palette = id;
@@ -205,7 +222,9 @@ async function read<T>(res: Response): Promise<T> {
 async function get<T>(op: string, id: number) {
   let res: Response;
   try {
-    res = await fetch(`${endpoint}?${new URLSearchParams({ op, id: String(id) })}`);
+    res = await fetch(
+      `${endpoint}?${new URLSearchParams({ op, id: String(id) })}`,
+    );
   } catch {
     throw new LightRequestError("unreachable_backend", 0);
   }
@@ -213,6 +232,12 @@ async function get<T>(op: string, id: number) {
 }
 
 export type Scene = "all" | "off" | "led" | "no_led";
+
+export type Kind = "wled" | "shelly";
+export const kinds: { value: Kind; label: string; hint: string }[] = [
+  { value: "wled", label: "WLED", hint: "LED strip or matrix running WLED" },
+  { value: "shelly", label: "Shelly", hint: "Plug or relay, on and off only" },
+];
 
 export const scenes: { value: Scene; label: string }[] = [
   { value: "all", label: "All lights" },
@@ -227,7 +252,9 @@ export const lightsApi = {
   state: (id: number) => get<LightState>("state", id),
   device: (id: number) => get<LightDevice>("device", id),
   presets: (id: number) =>
-    get<{ presets?: LightPreset[] | null }>("presets", id).then((data) => data.presets ?? []),
+    get<{ presets?: LightPreset[] | null }>("presets", id).then(
+      (data) => data.presets ?? [],
+    ),
   async apply(id: number, change: LightChange) {
     let res: Response;
     try {

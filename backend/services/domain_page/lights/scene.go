@@ -171,3 +171,12 @@ func wants(profile Profile, scene string) bool {
 
 	return false
 }
+
+func kindOf(userID, lightID int64) (string, error) {
+	stored, err := store.LightProfilesByOwner(db.DB, userID)
+	if err != nil {
+		return "", err
+	}
+
+	return profileOf(lightID, stored).Kind, nil
+}

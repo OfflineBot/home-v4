@@ -81,6 +81,8 @@ func lightResult(c fiber.Ctx, err error) error {
 		return lightError(c, fiber.StatusConflict, "presets_full")
 	case errors.Is(err, lights.ErrNotWLED):
 		return lightError(c, fiber.StatusUnprocessableEntity, "not_wled")
+	case errors.Is(err, lights.ErrNotShelly):
+		return lightError(c, fiber.StatusUnprocessableEntity, "not_shelly")
 	case errors.Is(err, lights.ErrUnreachable):
 		return lightError(c, fiber.StatusBadGateway, "unreachable")
 	}

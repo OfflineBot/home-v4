@@ -52,6 +52,7 @@ export function createLight(token: string, form: FormData) {
     {
       name: String(form.get("name") ?? "").trim(),
       url: String(form.get("url") ?? "").trim(),
+      kind: String(form.get("kind") ?? "wled"),
     },
     "Light added.",
   );

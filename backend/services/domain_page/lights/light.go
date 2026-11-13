@@ -25,6 +25,7 @@ type Light = store.Light
 type Input struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	Kind string `json:"kind"`
 }
 
 type Update struct {
@@ -132,6 +133,7 @@ var (
 	ErrDuplicate      = errors.New("light name or url already used")
 	ErrUnreachable    = errors.New("light not reachable")
 	ErrNotWLED        = errors.New("no wled device at url")
+	ErrNotShelly      = errors.New("no shelly device at url")
 )
 
 var client device = wled.New()
@@ -145,7 +147,14 @@ func Create(userID int64, in Input) (*Light, error) {
 	if err != nil {
 		return nil, err
 	}
-	base, err := checkedURL(in.URL)
+	kind := in.Kind
+	if kind == "" {
+		kind = KindWLED
+	}
+	if !slices.Contains(Kinds, kind) {
+		return nil, ErrUnknownKind
+	}
+	base, err := checkedURL(in.URL, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +162,10 @@ func Create(userID int64, in Input) (*Light, error) {
 	id, err := store.CreateLight(db.DB, Light{OwnerID: userID, Name: name, URL: base})
 	if err != nil {
 		return nil, storeError(err)
+	}
+
+	if err := SetProfile(userID, id, kind, nil); err != nil {
+		return nil, err
 	}
 
 	return store.LightByID(db.DB, userID, id)
@@ -178,7 +191,11 @@ func Edit(userID, id int64, in Update) (*Light, error) {
 			return nil, ErrInvalidURL
 		}
 		if base != light.URL {
-			if base, err = checkedURL(base); err != nil {
+			kind, err := kindOf(userID, id)
+			if err != nil {
+				return nil, err
+			}
+			if base, err = checkedURL(base, kind); err != nil {
 				return nil, err
 			}
 			light.URL = base
@@ -384,7 +401,9 @@ func lightName(raw string) (string, error) {
 	return name, nil
 }
 
-func checkedURL(raw string) (string, error) {
+// ParseBase only normalises and guards the address, so it serves both kinds;
+// which protocol has to answer at it is what the kind decides.
+func checkedURL(raw, kind string) (string, error) {
 	base, err := wled.ParseBase(raw)
 	if err != nil {
 		return "", ErrInvalidURL
@@ -392,6 +411,13 @@ func checkedURL(raw string) (string, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
+
+	if kind == KindShelly {
+		if _, err := shellyClient.Status(ctx, base); err != nil {
+			return "", fmt.Errorf("%w: %w", ErrNotShelly, err)
+		}
+		return base, nil
+	}
 
 	if _, err := client.Info(ctx, base); err != nil {
 		if errors.Is(err, wled.ErrUnexpected) {

@@ -17,9 +17,7 @@ export type DeviceEntry = {
 const armMs = 3000;
 
 export function ConnectedCount({ count }: { count: number }) {
-  return (
-    <Badge tone={count > 0 ? "good" : "neutral"}>{count} connected</Badge>
-  );
+  return <Badge tone={count > 0 ? "good" : "neutral"}>{count} connected</Badge>;
 }
 
 type DeviceListProps = {
@@ -58,7 +56,7 @@ export function DeviceList({ icon, removeIntent, devices }: DeviceListProps) {
   );
 }
 
-function RemoveDevice({ id, intent }: { id: number; intent: string }) {
+export function RemoveDevice({ id, intent }: { id: number; intent: string }) {
   const { fetcher, busy, toast } = useSubmission();
   const [armed, setArmed] = useState(false);
 
