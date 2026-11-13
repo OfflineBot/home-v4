@@ -62,6 +62,22 @@ type MessageProps = {
 
 function Message({ detail, backHref, onCompose }: MessageProps) {
   const revalidator = useRevalidator();
+  const marked = useRef<string | null>(null);
+
+  // opening a message counts as reading it; the ref keeps a re-render from
+  // firing a second request for the same message
+  useEffect(() => {
+    if (detail.is_read || marked.current === detail.id) return;
+
+    marked.current = detail.id;
+    setRead(detail.id, true).then(
+      () => revalidator.revalidate(),
+      () => {
+        marked.current = null;
+      },
+    );
+  }, [detail.id, detail.is_read, revalidator]);
+
   const files = (detail.attachments ?? []).filter(
     (attachment) => !attachment.is_inline,
   );
@@ -93,7 +109,10 @@ function Message({ detail, backHref, onCompose }: MessageProps) {
               title={detail.is_read ? "Mark as unread" : "Mark as read"}
               className="grid size-8 cursor-pointer place-items-center rounded-md text-ui-fg-muted outline-none transition-colors hover:bg-ui-hover hover:text-ui-fg focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none"
             >
-              <Icon name={detail.is_read ? "mail" : "check"} className="size-4" />
+              <Icon
+                name={detail.is_read ? "mail" : "check"}
+                className="size-4"
+              />
             </button>
             {replyModes.map((entry) => (
               <button
@@ -143,7 +162,10 @@ function Message({ detail, backHref, onCompose }: MessageProps) {
               rel="noreferrer"
               className="inline-flex max-w-full items-center gap-2 rounded-md border border-ui-border px-2.5 py-1 text-xs text-ui-fg outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none"
             >
-              <Icon name="files" className="size-3.5 shrink-0 text-ui-fg-muted" />
+              <Icon
+                name="files"
+                className="size-3.5 shrink-0 text-ui-fg-muted"
+              />
               <span className="min-w-0 truncate">{file.filename}</span>
               <span className="shrink-0 text-ui-fg-muted tabular-nums">
                 {formatSize(file.size)}
