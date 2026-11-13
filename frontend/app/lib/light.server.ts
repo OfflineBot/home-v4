@@ -20,7 +20,12 @@ export async function listLights(token: string) {
   return data.lights ?? [];
 }
 
-async function post(token: string, path: string, body: unknown, success: string): Promise<Result> {
+async function post(
+  token: string,
+  path: string,
+  body: unknown,
+  success: string,
+): Promise<Result> {
   const res = await api(`${base}${path}`, {
     method: "POST",
     headers: headers(token),
@@ -50,6 +55,36 @@ export function createLight(token: string, form: FormData) {
     },
     "Light added.",
   );
+}
+
+export function setLightProfile(token: string, form: FormData) {
+  const id = Number(form.get("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return Promise.resolve({ ok: false, message: "Unknown light." });
+  }
+
+  return post(
+    token,
+    "/profile",
+    {
+      id,
+      kind: String(form.get("kind") ?? "wled"),
+      scenes: form.getAll("scenes").map(String),
+    },
+    "Saved.",
+  );
+}
+
+export async function listLightProfiles(token: string) {
+  const res = await api("/api/lights/profiles", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+
+  const data = (await res.json().catch(() => ({}))) as {
+    profiles?: { light_id: number; kind: string; scenes: string[] | null }[];
+  };
+  return data.profiles ?? [];
 }
 
 export function deleteLight(token: string, form: FormData) {

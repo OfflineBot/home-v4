@@ -21,7 +21,10 @@ func LightRouter(r fiber.Router) {
 		Post("/state", setLightState).
 		Get("/presets", lightPresets).
 		Post("/presets/save", saveLightPreset).
-		Post("/presets/delete", deleteLightPreset)
+		Post("/presets/delete", deleteLightPreset).
+		Get("/profiles", lightProfiles).
+		Post("/profile", setLightProfile).
+		Post("/scene", applyLightScene)
 }
 
 type lightTarget struct {
@@ -54,6 +57,10 @@ func lightError(c fiber.Ctx, status int, code string) error {
 
 func lightResult(c fiber.Ctx, err error) error {
 	switch {
+	case errors.Is(err, lights.ErrUnknownScene):
+		return lightError(c, fiber.StatusBadRequest, "unknown_scene")
+	case errors.Is(err, lights.ErrUnknownKind):
+		return lightError(c, fiber.StatusBadRequest, "unknown_kind")
 	case errors.Is(err, lights.ErrInvalidLight):
 		return lightError(c, fiber.StatusBadRequest, "invalid_light")
 	case errors.Is(err, lights.ErrInvalidURL):
@@ -221,4 +228,46 @@ func deleteLightPreset(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func lightProfiles(c fiber.Ctx) error {
+	profiles, err := lights.Profiles(lightUser(c))
+	if err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.JSON(fiber.Map{"profiles": profiles, "scenes": lights.Scenes, "kinds": lights.Kinds})
+}
+
+func setLightProfile(c fiber.Ctx) error {
+	var body struct {
+		ID     int64    `json:"id"`
+		Kind   string   `json:"kind"`
+		Scenes []string `json:"scenes"`
+	}
+	if err := c.Bind().JSON(&body); err != nil {
+		return lightError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	if err := lights.SetProfile(lightUser(c), body.ID, body.Kind, body.Scenes); err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func applyLightScene(c fiber.Ctx) error {
+	var body struct {
+		Scene string `json:"scene"`
+	}
+	if err := c.Bind().JSON(&body); err != nil {
+		return lightError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	result, err := lights.Apply(lightUser(c), body.Scene)
+	if err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.JSON(result)
 }

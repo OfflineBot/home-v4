@@ -1,10 +1,11 @@
 import type { Route } from "./+types/lights.api";
 import { api } from "../lib/api";
-import { changeKeys, type LightChange } from "../lib/light";
+import { changeKeys, scenes, type LightChange } from "../lib/light";
 import { requireToken } from "../lib/session";
 
 const base = "/api/lights";
 const deviceTimeoutMs = 12_000;
+const sceneTimeoutMs = 20_000;
 const reads = new Set(["state", "device", "presets"]);
 
 function lightId(value: unknown) {
@@ -64,7 +65,28 @@ export async function action({ request }: Route.ActionArgs) {
   const body = (await request.json().catch(() => null)) as {
     id?: unknown;
     change?: unknown;
+    scene?: unknown;
   } | null;
+
+  // a scene drives every light at once, so it carries no id
+  if (typeof body?.scene === "string") {
+    if (!scenes.some((entry) => entry.value === body.scene)) {
+      return Response.json({ error: "unknown_scene" }, { status: 400 });
+    }
+
+    return relay(
+      await api(`${base}/scene`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ scene: body.scene }),
+        signal: AbortSignal.timeout(sceneTimeoutMs),
+      }),
+    );
+  }
+
   const id = lightId(body?.id);
   const change = cleanChange(body?.change);
 

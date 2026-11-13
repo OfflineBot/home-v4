@@ -79,3 +79,54 @@ func DeleteLight(conn *sql.DB, ownerID, id int64) error {
 
 	return affectedOne(result)
 }
+
+type LightProfile struct {
+	LightID int64  `json:"light_id"`
+	Kind    string `json:"kind"`
+	Scenes  string `json:"scenes"`
+}
+
+func LightProfilesByOwner(conn *sql.DB, ownerID int64) (map[int64]LightProfile, error) {
+	rows, err := conn.Query(`
+		SELECT p.light_id, p.kind, p.scenes
+		FROM light_profiles p JOIN lights l ON l.id = p.light_id
+		WHERE l.owner_id = ?`, ownerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	profiles := map[int64]LightProfile{}
+	for rows.Next() {
+		var p LightProfile
+		if err := rows.Scan(&p.LightID, &p.Kind, &p.Scenes); err != nil {
+			return nil, err
+		}
+		profiles[p.LightID] = p
+	}
+
+	return profiles, rows.Err()
+}
+
+func SetLightProfile(conn *sql.DB, ownerID, lightID int64, kind, scenes string) error {
+	result, err := conn.Exec(`
+		INSERT INTO light_profiles (light_id, kind, scenes)
+		SELECT id, ?, ? FROM lights WHERE id = ? AND owner_id = ?
+		ON CONFLICT (light_id) DO UPDATE SET kind = excluded.kind, scenes = excluded.scenes`,
+		kind, scenes, lightID, ownerID,
+	)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}

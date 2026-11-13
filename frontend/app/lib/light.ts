@@ -212,6 +212,17 @@ async function get<T>(op: string, id: number) {
   return read<T>(res);
 }
 
+export type Scene = "all" | "off" | "led" | "no_led";
+
+export const scenes: { value: Scene; label: string }[] = [
+  { value: "all", label: "All lights" },
+  { value: "off", label: "All lights off" },
+  { value: "led", label: "LED only" },
+  { value: "no_led", label: "No LED only" },
+];
+
+export type SceneResult = { scene: Scene; changed: number; failed: number[] };
+
 export const lightsApi = {
   state: (id: number) => get<LightState>("state", id),
   device: (id: number) => get<LightDevice>("device", id),
@@ -229,5 +240,18 @@ export const lightsApi = {
       throw new LightRequestError("unreachable_backend", 0);
     }
     return read<LightState>(res);
+  },
+  async scene(scene: Scene) {
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene }),
+      });
+    } catch {
+      throw new LightRequestError("unreachable_backend", 0);
+    }
+    return read<SceneResult>(res);
   },
 };

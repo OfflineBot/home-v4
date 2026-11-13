@@ -11,21 +11,34 @@ import {
   type Notice,
   type SeenSource,
 } from "../../lib/dashboard";
-import { lightsApi, type Light, type LightState } from "../../lib/light";
+import { lightsApi, scenes, type Light, type Scene } from "../../lib/light";
 
 export type MailSummary = { connected: boolean; unread: number | null };
-export type NoticeSummary = { items: Notice[]; grades: SeenSource; moodle: SeenSource };
+export type NoticeSummary = {
+  items: Notice[];
+  grades: SeenSource;
+  moodle: SeenSource;
+};
 
-const frameClass = "flex min-h-32 w-full min-w-0 flex-col gap-3 rounded-xl border border-ui-border bg-ui-raised p-4 text-left";
+const frameClass =
+  "flex min-h-32 w-full min-w-0 flex-col gap-3 rounded-xl border border-ui-border bg-ui-raised p-4 text-left";
 
 const linkClass =
   "outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none";
 
-function Heading({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
+function Heading({
+  children,
+  aside,
+}: {
+  children: ReactNode;
+  aside?: ReactNode;
+}) {
   return (
     <span className="flex items-center gap-2">
       <span className="text-sm font-medium text-ui-fg-muted">{children}</span>
-      {aside && <span className="ml-auto flex items-center gap-2">{aside}</span>}
+      {aside && (
+        <span className="ml-auto flex items-center gap-2">{aside}</span>
+      )}
     </span>
   );
 }
@@ -41,8 +54,12 @@ export function MailTile({ mail }: { mail: MailSummary }) {
     <Link to="/mail" className={`${frameClass} ${linkClass}`}>
       <Heading>Mail</Heading>
       <span className="flex items-baseline gap-2">
-        <span className="text-5xl font-semibold text-ctp-teal tabular-nums">{unread}</span>
-        <span className="text-base text-ui-fg-muted">{unread === 1 ? "unread mail" : "unread mails"}</span>
+        <span className="text-5xl font-semibold text-ctp-teal tabular-nums">
+          {unread}
+        </span>
+        <span className="text-base text-ui-fg-muted">
+          {unread === 1 ? "unread mail" : "unread mails"}
+        </span>
       </span>
     </Link>
   );
@@ -52,8 +69,10 @@ const shownNotices = 3;
 
 export function useSeenBaseline(notices: NoticeSummary) {
   useEffect(() => {
-    if (notices.grades.baseline && notices.grades.keys.length > 0) writeSeen(notices.grades.keys, gradesSeenCookie);
-    if (notices.moodle.baseline && notices.moodle.keys.length > 0) writeSeen(notices.moodle.keys, moodleSeenCookie);
+    if (notices.grades.baseline && notices.grades.keys.length > 0)
+      writeSeen(notices.grades.keys, gradesSeenCookie);
+    if (notices.moodle.baseline && notices.moodle.keys.length > 0)
+      writeSeen(notices.moodle.keys, moodleSeenCookie);
   }, [notices.grades.keys.join("."), notices.moodle.keys.join(".")]);
 }
 
@@ -61,8 +80,10 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
   const [cleared, setCleared] = useState(false);
 
   function markSeen(source?: Notice["source"]) {
-    if (!source || source === "grades") writeSeen(notices.grades.keys, gradesSeenCookie);
-    if (!source || source === "moodle") writeSeen(notices.moodle.keys, moodleSeenCookie);
+    if (!source || source === "grades")
+      writeSeen(notices.grades.keys, gradesSeenCookie);
+    if (!source || source === "moodle")
+      writeSeen(notices.moodle.keys, moodleSeenCookie);
   }
 
   const items = cleared ? [] : notices.items;
@@ -97,8 +118,12 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
               className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${linkClass}`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-ui-fg">{notice.title}</span>
-                <span className="block truncate text-xs text-ui-fg-muted">{notice.detail}</span>
+                <span className="block truncate text-sm font-medium text-ui-fg">
+                  {notice.title}
+                </span>
+                <span className="block truncate text-xs text-ui-fg-muted">
+                  {notice.detail}
+                </span>
               </span>
               <span
                 style={accentVars(notice.color)}
@@ -110,129 +135,76 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
           </li>
         ))}
         {items.length > shownNotices && (
-          <li className="px-2 pt-1 text-xs text-ui-fg-faint">+{items.length - shownNotices}</li>
+          <li className="px-2 pt-1 text-xs text-ui-fg-faint">
+            +{items.length - shownNotices}
+          </li>
         )}
       </ul>
     </div>
   );
 }
 
-type Entry = LightState | "loading" | "error";
-
 const refreshMs = 60_000;
 
 export function LightsTile({ lights }: { lights: Light[] }) {
-  const shown = lights;
-  const [states, setStates] = useState<Record<number, Entry>>({});
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState({ message: "", attempt: 0 });
-  const ids = shown.map((light) => light.id).join(",");
+  const [busy, setBusy] = useState<Scene | null>(null);
+  const [failure, setFailure] = useState({ attempt: 0, message: "" });
 
-  const load = useCallback(() => {
-    for (const light of shown) {
-      lightsApi.state(light.id).then(
-        (state) => setStates((current) => ({ ...current, [light.id]: state })),
-        () => setStates((current) => ({ ...current, [light.id]: "error" })),
-      );
-    }
-  }, [ids]);
+  if (lights.length === 0) return null;
 
-  useEffect(() => {
-    load();
-    const refresh = () => {
-      if (document.visibilityState === "visible") load();
-    };
-    const id = setInterval(refresh, refreshMs);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
-
-  const known = shown.filter((light) => typeof states[light.id] === "object");
-  const anyOn = known.some((light) => (states[light.id] as LightState).on);
-
-  async function switchAll(on: boolean) {
-    const before = states;
-    setBusy(true);
-    setStates((current) => {
-      const next = { ...current };
-      for (const light of known) next[light.id] = { ...(current[light.id] as LightState), on };
-      return next;
-    });
-
-    const results = await Promise.allSettled(known.map((light) => lightsApi.apply(light.id, { on })));
-    const failed: string[] = [];
-    results.forEach((result, index) => {
-      const light = known[index];
-      if (result.status === "fulfilled") {
-        setStates((current) => ({ ...current, [light.id]: result.value }));
-      } else {
-        failed.push(light.name);
-        setStates((current) => ({ ...current, [light.id]: before[light.id] ?? "error" }));
+  async function run(scene: Scene) {
+    setBusy(scene);
+    try {
+      const result = await lightsApi.scene(scene);
+      if (result.failed.length > 0) {
+        setFailure((prev) => ({
+          attempt: prev.attempt + 1,
+          message:
+            result.failed.length === 1
+              ? "One light did not answer."
+              : `${result.failed.length} lights did not answer.`,
+        }));
       }
-    });
-    if (failed.length > 0) {
-      setFailure((current) => ({ message: `Could not switch ${failed.join(", ")}.`, attempt: current.attempt + 1 }));
+    } catch {
+      setFailure((prev) => ({
+        attempt: prev.attempt + 1,
+        message: "The lights could not be reached.",
+      }));
+    } finally {
+      setBusy(null);
     }
-    setBusy(false);
   }
-
-  const blocked = known.length === 0 || busy;
-  if (shown.length === 0) return null;
 
   return (
     <>
-      <div className={`${frameClass} ${anyOn ? "border-[color-mix(in_oklab,var(--ctp-pink)_55%,transparent)]" : ""}`}>
-        <Link to="/lights" className={`-m-2 flex flex-col gap-3 rounded-lg p-2 ${linkClass}`}>
+      <div className={frameClass}>
+        <Link to="/lights" className={`-m-2 rounded-lg p-2 ${linkClass}`}>
           <Heading>Lights</Heading>
-          <span className="flex flex-wrap items-center gap-2.5">
-            {shown.map((light) => {
-              const entry = states[light.id];
-              const on = typeof entry === "object" && entry.on;
-              return (
-                <span
-                  key={light.id}
-                  title={`${light.name} · ${entry === "error" ? "not reachable" : on ? "on" : "off"}`}
-                  className={`grid size-9 place-items-center rounded-full transition-[background-color,box-shadow,color] duration-300 motion-reduce:transition-none ${
-                    entry === "error"
-                      ? "border-2 border-dashed border-ui-danger text-ui-danger"
-                      : on
-                        ? "bg-ctp-pink text-ui-frame shadow-[0_0_14px_var(--ctp-pink)]"
-                        : entry === undefined
-                          ? "animate-pulse bg-ui-field text-ui-fg-faint"
-                          : "bg-ui-field text-ui-fg-faint"
-                  }`}
-                >
-                  <Icon name="lights" className="size-4.5" />
-                </span>
-              );
-            })}
-          </span>
         </Link>
         <span className="mt-auto grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={blocked}
-            onClick={() => switchAll(true)}
-            className={`${primaryButtonClass} inline-flex h-12! items-center justify-center gap-2 text-base`}
-          >
-            <Icon name="lights" className="size-5" />
-            On
-          </button>
-          <button
-            type="button"
-            disabled={blocked}
-            onClick={() => switchAll(false)}
-            className={`${buttonClass} inline-flex h-12! items-center justify-center gap-2 text-base`}
-          >
-            <Icon name="power" className="size-5" />
-            Off
-          </button>
+          {scenes.map((scene) => (
+            <button
+              key={scene.value}
+              type="button"
+              disabled={busy !== null}
+              onClick={() => run(scene.value)}
+              className={`${
+                scene.value === "all" ? primaryButtonClass : buttonClass
+              } inline-flex h-12! items-center justify-center gap-2 text-sm`}
+            >
+              <Icon
+                name={scene.value === "off" ? "power" : "lights"}
+                className="size-5"
+              />
+              {scene.label}
+            </button>
+          ))}
         </span>
       </div>
-      <Toast key={failure.attempt} message={failure.attempt > 0 ? failure.message : null} />
+      <Toast
+        key={failure.attempt}
+        message={failure.attempt > 0 ? failure.message : null}
+      />
     </>
   );
 }

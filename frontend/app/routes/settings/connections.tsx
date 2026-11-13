@@ -13,7 +13,13 @@ import {
   type DHBWAccount,
   type DHBWResult,
 } from "../../lib/dhbw";
-import { createLight, deleteLight, listLights } from "../../lib/light.server";
+import {
+  createLight,
+  deleteLight,
+  listLightProfiles,
+  listLights,
+  setLightProfile,
+} from "../../lib/light.server";
 import {
   createMachine,
   deleteMachine,
@@ -28,11 +34,12 @@ const verifyTimeoutMs = 90000;
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const headers = { Authorization: `Bearer ${token}` };
-  const [dhbw, timetable, machines, lights] = await Promise.all([
+  const [dhbw, timetable, machines, lights, lightProfiles] = await Promise.all([
     api(dhbwPath, { headers }),
     api(timetablePath, { headers }),
     listMachines(token),
     listLights(token),
+    listLightProfiles(token),
   ]);
 
   return {
@@ -43,6 +50,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       : null,
     machines,
     lights,
+    lightProfiles,
   };
 }
 
@@ -136,6 +144,7 @@ export async function action({
   if (intent === "add-machine") return createMachine(token, form);
   if (intent === "delete-machine") return deleteMachine(token, form);
   if (intent === "add-light") return createLight(token, form);
+  if (intent === "set-light-profile") return setLightProfile(token, form);
   if (intent === "delete-light") return deleteLight(token, form);
 
   const target = dhbwTarget(form);
@@ -173,7 +182,10 @@ export default function ConnectionsSettings({
         timetable={loaderData.timetable}
       />
       <MachineConnection machines={loaderData.machines} />
-      <LightsConnection lights={loaderData.lights} />
+      <LightsConnection
+        lights={loaderData.lights}
+        profiles={loaderData.lightProfiles}
+      />
     </Stack>
   );
 }

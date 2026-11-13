@@ -9,3 +9,11 @@ CREATE TABLE IF NOT EXISTS lights (
 );
 
 CREATE INDEX IF NOT EXISTS idx_lights_owner ON lights(owner_id);
+
+-- a side table, not a column on lights: the schema runner only creates tables,
+-- so a new column would never reach an existing database
+CREATE TABLE IF NOT EXISTS light_profiles (
+	light_id INTEGER PRIMARY KEY REFERENCES lights(id) ON DELETE CASCADE,
+	kind     TEXT NOT NULL DEFAULT 'wled' CHECK (kind IN ('wled', 'shelly')),
+	scenes   TEXT NOT NULL DEFAULT ''
+);
