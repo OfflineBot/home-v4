@@ -49,7 +49,10 @@ func GitRouter(r fiber.Router) {
 		Post("/projects/delete", deleteGitProject).
 		Get("/tokens", listGitTokens).
 		Post("/tokens/new", newGitToken).
-		Post("/tokens/delete", deleteGitToken)
+		Post("/tokens/delete", deleteGitToken).
+		Get("/keys", listGitKeys).
+		Post("/keys/new", newGitKey).
+		Post("/keys/delete", deleteGitKey)
 }
 
 func gitOwner(c fiber.Ctx) git.Owner {
@@ -214,6 +217,45 @@ func deleteGitToken(c fiber.Ctx) error {
 	}
 
 	if err := git.DeleteToken(gitOwner(c), body.ID); err != nil {
+		return gitResult(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func listGitKeys(c fiber.Ctx) error {
+	keys, err := git.SSHKeys(gitOwner(c))
+	if err != nil {
+		return gitResult(c, err)
+	}
+
+	return c.JSON(fiber.Map{"keys": keys})
+}
+
+func newGitKey(c fiber.Ctx) error {
+	var body struct {
+		Name string `json:"name"`
+		Key  string `json:"key"`
+	}
+	if err := c.Bind().JSON(&body); err != nil {
+		return gitError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	key, err := git.AddSSHKey(gitOwner(c), body.Name, body.Key)
+	if err != nil {
+		return gitResult(c, err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(key)
+}
+
+func deleteGitKey(c fiber.Ctx) error {
+	var body gitTokenTarget
+	if err := c.Bind().JSON(&body); err != nil {
+		return gitError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	if err := git.DeleteSSHKey(gitOwner(c), body.ID); err != nil {
 		return gitResult(c, err)
 	}
 

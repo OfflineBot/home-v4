@@ -1,4 +1,3 @@
-
 package services
 
 import (
@@ -20,6 +19,7 @@ import (
 	"home-v4/backend/services/domain_page/publicstore"
 	"home-v4/backend/services/storage"
 	"home-v4/backend/services/syncer"
+	"log"
 	"time"
 )
 
@@ -54,6 +54,11 @@ func Setup() error {
 
 	if err := git.Setup(); err != nil {
 		return fmt.Errorf("Git setup failed with error: %w", err)
+	}
+
+	// the ssh transport is optional: a busy port must not stop the server
+	if err := git.StartSSH(); err != nil {
+		log.Printf("git ssh transport disabled: %v", err)
 	}
 	auth.OnDelete(git.ArchiveUser)
 

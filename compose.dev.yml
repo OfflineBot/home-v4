@@ -15,6 +15,7 @@ services:
       AUTOMATION_BACKEND_URL: http://backend:8080
       STORAGE_DIR: /storage
       GIT_REPOS_DIR: /repos
+      GIT_SSH_ADDR: ":${GIT_SSH_PORT:-2222}"
       PAGES_BASE_URL: ${PAGES_BASE_URL:-}
     volumes:
       - backend-data:/data

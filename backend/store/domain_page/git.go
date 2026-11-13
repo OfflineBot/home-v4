@@ -31,6 +31,15 @@ type GitToken struct {
 	LastUsedAt *string `json:"last_used_at"`
 }
 
+type GitSSHKey struct {
+	ID          int64   `json:"id"`
+	OwnerID     int64   `json:"-"`
+	Name        string  `json:"name"`
+	Fingerprint string  `json:"fingerprint"`
+	CreatedAt   string  `json:"created_at"`
+	LastUsedAt  *string `json:"last_used_at"`
+}
+
 type GitTokenOwner struct {
 	TokenID    int64
 	OwnerID    int64
@@ -234,4 +243,76 @@ func scanGitRepo(row rowScanner) (*GitRepo, error) {
 	}
 
 	return &r, nil
+}
+
+func CreateGitSSHKey(conn *sql.DB, ownerID int64, name, fingerprint, publicKey string) (*GitSSHKey, error) {
+	result, err := conn.Exec(
+		"INSERT INTO git_ssh_keys (owner_id, name, fingerprint, public_key) VALUES (?, ?, ?, ?)",
+		ownerID, name, fingerprint, publicKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	var key GitSSHKey
+	err = conn.QueryRow(
+		"SELECT id, owner_id, name, fingerprint, created_at, last_used_at FROM git_ssh_keys WHERE id = ?", id,
+	).Scan(&key.ID, &key.OwnerID, &key.Name, &key.Fingerprint, &key.CreatedAt, &key.LastUsedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &key, nil
+}
+
+func GitSSHKeysByOwner(conn *sql.DB, ownerID int64) ([]GitSSHKey, error) {
+	rows, err := conn.Query(`
+		SELECT id, owner_id, name, fingerprint, created_at, last_used_at
+		FROM git_ssh_keys WHERE owner_id = ? ORDER BY created_at`, ownerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	keys := []GitSSHKey{}
+	for rows.Next() {
+		var key GitSSHKey
+		if err := rows.Scan(&key.ID, &key.OwnerID, &key.Name, &key.Fingerprint,
+			&key.CreatedAt, &key.LastUsedAt); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+
+	return keys, rows.Err()
+}
+
+func GitSSHKeyOwnerByFingerprint(conn *sql.DB, fingerprint string) (*GitTokenOwner, error) {
+	var o GitTokenOwner
+	err := conn.QueryRow(`
+		SELECT k.id, k.owner_id, u.name, u.approved_at IS NOT NULL, k.last_used_at
+		FROM git_ssh_keys k JOIN users u ON u.id = k.owner_id
+		WHERE k.fingerprint = ?`, fingerprint,
+	).Scan(&o.TokenID, &o.OwnerID, &o.OwnerName, &o.Approved, &o.LastUsedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &o, nil
+}
+
+func TouchGitSSHKey(conn *sql.DB, id int64, at string) error {
+	_, err := conn.Exec("UPDATE git_ssh_keys SET last_used_at = ? WHERE id = ?", at, id)
+	return err
+}
+
+func DeleteGitSSHKey(conn *sql.DB, ownerID, id int64) error {
+	_, err := conn.Exec("DELETE FROM git_ssh_keys WHERE owner_id = ? AND id = ?", ownerID, id)
+	return err
 }
