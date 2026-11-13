@@ -316,3 +316,23 @@ func DeleteGitSSHKey(conn *sql.DB, ownerID, id int64) error {
 	_, err := conn.Exec("DELETE FROM git_ssh_keys WHERE owner_id = ? AND id = ?", ownerID, id)
 	return err
 }
+
+func PublicGitRepos(conn *sql.DB) ([]GitRepo, error) {
+	rows, err := conn.Query("SELECT " + gitRepoColumns + " " + gitRepoJoin +
+		" WHERE r.private = 0 AND u.approved_at IS NOT NULL ORDER BY r.created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	repos := []GitRepo{}
+	for rows.Next() {
+		r, err := scanGitRepo(rows)
+		if err != nil {
+			return nil, err
+		}
+		repos = append(repos, *r)
+	}
+
+	return repos, rows.Err()
+}

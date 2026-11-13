@@ -390,11 +390,19 @@ func view(p *store.Page) View {
 	if !p.Enabled {
 		v.Status = statusDisabled
 	}
-	if base := strings.TrimRight(os.Getenv(baseURLEnv), "/"); base != "" {
-		v.URL = base + v.Path
-	}
+	v.URL = URL(p.Name)
 
 	return v
+}
+
+// URL is where a page is served, empty while no public base is configured.
+func URL(name string) string {
+	base := strings.TrimRight(os.Getenv(baseURLEnv), "/")
+	if base == "" {
+		return ""
+	}
+
+	return base + "/" + name + "/"
 }
 
 func validName(name string) bool {

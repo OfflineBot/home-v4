@@ -29,6 +29,7 @@ export default [
   route("git/api", "routes/git.api.ts"),
   route("pages/api", "routes/pages.api.ts"),
   route("public/api", "routes/public.api.ts"),
+  route("explore", "routes/explore.tsx"),
 
   layout("layouts/app.tsx", [
     index("routes/home.tsx"),

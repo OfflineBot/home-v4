@@ -9,6 +9,7 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   { slug: "automation", label: "Automation", color: "mauve" },
   { slug: "calendar", label: "Calendar", color: "blue" },
+  { slug: "explore", label: "Explore", color: "rosewater" },
   { slug: "files", label: "Files", color: "sapphire" },
   { slug: "git", label: "Git", color: "peach" },
   { slug: "grades", label: "Grades", color: "yellow" },

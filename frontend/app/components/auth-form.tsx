@@ -148,9 +148,12 @@ export function AuthForm({
         message={mismatch ? "Passwords do not match." : (error ?? null)}
       />
 
-      <p className="mt-5 text-sm text-ui-fg-muted">
+      <p className="mt-5 flex items-center justify-between gap-3 text-sm text-ui-fg-muted">
         <Link to={altHref} className="underline hover:text-ui-fg">
           {altLabel}
+        </Link>
+        <Link to="/explore" className="underline hover:text-ui-fg">
+          Explore
         </Link>
       </p>
     </>

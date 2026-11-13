@@ -97,3 +97,23 @@ func scanPage(row rowScanner) (*Page, error) {
 
 	return &p, nil
 }
+
+func PublicPages(conn *sql.DB) ([]Page, error) {
+	rows, err := conn.Query("SELECT " + pageColumns + " " + pageJoin +
+		" WHERE pg.enabled = 1 AND u.approved_at IS NOT NULL ORDER BY pg.updated_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pages := []Page{}
+	for rows.Next() {
+		p, err := scanPage(rows)
+		if err != nil {
+			return nil, err
+		}
+		pages = append(pages, *p)
+	}
+
+	return pages, rows.Err()
+}
