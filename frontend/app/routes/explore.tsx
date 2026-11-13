@@ -39,9 +39,22 @@ type PublicFile = {
   downloads: number;
 };
 
-type Listing = { repos: Repo[]; pages: SitePage[]; files: PublicFile[] };
+type Release = {
+  version: string;
+  build: number;
+  name: string;
+  path: string;
+  size: number;
+};
 
-const empty: Listing = { repos: [], pages: [], files: [] };
+type Listing = {
+  repos: Repo[];
+  pages: SitePage[];
+  files: PublicFile[];
+  app: Release | null;
+};
+
+const empty: Listing = { repos: [], pages: [], files: [], app: null };
 
 export function meta() {
   return [{ title: "Explore" }];
@@ -65,6 +78,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     repos: listing.repos ?? [],
     pages: listing.pages ?? [],
     files: listing.files ?? [],
+    app: listing.app ?? null,
     signedIn: user !== null,
     isAdmin: user?.is_admin === true,
     sidebarOpen: readSidebarOpen(cookie),
@@ -132,11 +146,34 @@ function Nothing({ message }: { message: string }) {
 }
 
 export default function Explore({ loaderData }: Route.ComponentProps) {
-  const { repos, pages, files, signedIn, isAdmin, sidebarOpen } = loaderData;
+  const { repos, pages, files, app, signedIn, isAdmin, sidebarOpen } =
+    loaderData;
 
   return (
     <Frame signedIn={signedIn} isAdmin={isAdmin} sidebarOpen={sidebarOpen}>
       <Stack>
+        {app && (
+          <Block title="Android app">
+            <div className="flex flex-wrap items-center gap-3">
+              <Icon
+                name="download"
+                className="size-4 shrink-0 text-ui-fg-muted"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-ui-fg">
+                  Version {app.version}
+                </span>
+                <span className="block text-xs text-ui-fg-muted tabular-nums">
+                  {formatSize(app.size)} · installs over the browser
+                </span>
+              </span>
+              <a href={app.path} className={primaryButtonClass + " leading-9"}>
+                Download
+              </a>
+            </div>
+          </Block>
+        )}
+
         <Block title="Repositories" status={<Count value={repos.length} />}>
           {repos.length === 0 ? (
             <Nothing message="No public repository yet." />

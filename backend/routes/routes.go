@@ -19,6 +19,7 @@ var publicPaths = []string{
 	domainpage.TerminalConnectPath,
 	domainpage.NotifyHookPath,
 	domainpage.ExplorePath,
+	domainpage.AppVersionPath,
 }
 
 // / collects all routs from the router and groups them
@@ -43,6 +44,7 @@ func CollectRoutes(r fiber.Router) {
 	domainpage.NotifyRouter(r.Group("/notifications"))
 	domainpage.PublicStoreRouter(r.Group("/public"))
 	domainpage.ExploreRouter(r.Group("/explore"))
+	domainpage.AppRouter(r.Group("/app"))
 	integrationRouter(r.Group("/integration"))
 
 	// the hook carries its key in the URL, so it is rate limited by itself

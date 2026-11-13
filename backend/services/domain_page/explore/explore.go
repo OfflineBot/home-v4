@@ -4,6 +4,7 @@ package explore
 
 import (
 	"home-v4/backend/services/db"
+	"home-v4/backend/services/domain_page/appversion"
 	"home-v4/backend/services/domain_page/git"
 	"home-v4/backend/services/domain_page/pages"
 	"home-v4/backend/services/domain_page/publicstore"
@@ -29,9 +30,10 @@ type Page struct {
 }
 
 type Listing struct {
-	Repos []Repo             `json:"repos"`
-	Pages []Page             `json:"pages"`
-	Files []publicstore.File `json:"files"`
+	Repos []Repo              `json:"repos"`
+	Pages []Page              `json:"pages"`
+	Files []publicstore.File  `json:"files"`
+	App   *appversion.Release `json:"app"`
 }
 
 func Load() (*Listing, error) {
@@ -50,7 +52,13 @@ func Load() (*Listing, error) {
 		return nil, err
 	}
 
+	release, err := appversion.Latest()
+	if err != nil {
+		return nil, err
+	}
+
 	listing := &Listing{
+		App:   release,
 		Repos: make([]Repo, 0, len(repos)),
 		Pages: make([]Page, 0, len(sites)),
 		Files: files,
