@@ -569,14 +569,14 @@ func (t *terminal) listSessions(client *ssh.Client) {
 
 	var exit *ssh.ExitError
 	if errors.As(err, &exit) && exit.ExitStatus() == tmuxMissingCode {
-		t.send(event{Type: "tmux", Tmux: "missing"})
+		t.send(event{Type: "tmux", Tmux: tmuxMissing})
 		return
 	}
 	if err != nil {
 		return
 	}
 
-	t.send(event{Type: "tmux", Tmux: "ok", Sessions: parseSessions(string(out))})
+	t.send(event{Type: "tmux", Tmux: tmuxOK, Sessions: parseSessions(string(out))})
 }
 
 func parseSessions(out string) []TmuxSession {

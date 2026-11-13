@@ -33,6 +33,7 @@ func MachineRouter(r fiber.Router) {
 		Post("/new", newTerminal).
 		Post("/delete", deleteTerminal).
 		Get("/list", listTerminals).
+		Post("/sessions", listTmuxSessions).
 		Post("/ticket", terminalTicket).
 		Get("/connect", terminalUpgrade, websocket.New(terminalConnect)).
 		Get("/hostkey", terminalHostKey).
@@ -41,6 +42,11 @@ func MachineRouter(r fiber.Router) {
 
 type machineTarget struct {
 	ID int64 `json:"id"`
+}
+
+type sessionsInput struct {
+	ID       int64  `json:"id"`
+	Password string `json:"password"`
 }
 
 func machineError(c fiber.Ctx, status int, code string) error {
@@ -59,8 +65,14 @@ func machineResult(c fiber.Ctx, err error) error {
 		return machineError(c, fiber.StatusBadGateway, "wake_failed")
 	case errors.Is(err, machine.ErrInvalidTicket):
 		return machineError(c, fiber.StatusUnauthorized, "invalid_ticket")
-	case errors.Is(err, machine.ErrTooManyTickets):
+	case errors.Is(err, machine.ErrTooManyTickets), errors.Is(err, machine.ErrBusy):
 		return machineError(c, fiber.StatusTooManyRequests, "too_many_requests")
+	case errors.Is(err, machine.ErrUnreachable):
+		return machineError(c, fiber.StatusBadGateway, "unreachable")
+	case errors.Is(err, machine.ErrAuthFailed):
+		return machineError(c, fiber.StatusUnauthorized, "auth_failed")
+	case errors.Is(err, machine.ErrHostKeyChanged):
+		return machineError(c, fiber.StatusConflict, "host_key_changed")
 	default:
 		return machineError(c, fiber.StatusInternalServerError, "internal")
 	}
@@ -135,6 +147,22 @@ func listTerminals(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"machines": machines})
+}
+
+func listTmuxSessions(c fiber.Ctx) error {
+	var body sessionsInput
+	if err := c.Bind().JSON(&body); err != nil {
+		return machineError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	user := fiber.Locals[*auth.User](c, auth.ContextKey)
+
+	list, err := machine.Sessions(user.ID, body.ID, body.Password)
+	if err != nil {
+		return machineResult(c, err)
+	}
+
+	return c.JSON(list)
 }
 
 func terminalTicket(c fiber.Ctx) error {
