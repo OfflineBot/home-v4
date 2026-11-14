@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Block } from "../block";
 import { Icon } from "../icons";
-import { buttonClass, inputClass, primaryButtonClass } from "../setting-row";
+import {
+  buttonClass,
+  inputClass,
+  primaryButtonClass,
+} from "../setting-row";
 import {
   lightsApi,
   maxSleepMinutes,
@@ -10,12 +14,39 @@ import {
 } from "../../lib/light";
 
 function remainingLabel(seconds: number) {
-  const minutes = Math.ceil(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+  }
 
-  const hours = Math.floor(minutes / 60);
+  const minutes = Math.ceil(seconds / 60);
   const rest = minutes % 60;
+  const hours = Math.floor(minutes / 60);
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+// the devices count down on their own, so the page only has to tick along
+// between the status reads instead of asking every second
+function useCountdown(timers: SleepTimerEntry[]) {
+  const [seen, setSeen] = useState(timers);
+  const [since, setSince] = useState(() => Date.now());
+  const [, setTick] = useState(0);
+
+  if (seen !== timers) {
+    setSeen(timers);
+    setSince(Date.now());
+  }
+
+  const running = timers.length > 0;
+
+  useEffect(() => {
+    if (!running) return;
+    const handle = setInterval(() => setTick((value) => value + 1), 1000);
+    return () => clearInterval(handle);
+  }, [running]);
+
+  return (seconds: number) =>
+    Math.max(0, seconds - Math.floor((Date.now() - since) / 1000));
 }
 
 type SleepTimerProps = {
@@ -31,6 +62,8 @@ export function SleepTimer({ timers, onFailure, onChanged }: SleepTimerProps) {
   const [minutes, setMinutes] = useState("30");
   const [fade, setFade] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const left = useCountdown(timers);
 
   const wanted = Number(minutes);
   const valid =
@@ -38,10 +71,14 @@ export function SleepTimer({ timers, onFailure, onChanged }: SleepTimerProps) {
     wanted >= minSleepMinutes &&
     wanted <= maxSleepMinutes;
 
-  async function run(next: number | null, id?: number) {
+  // with a countdown running the form stays folded away: an extra tap on
+  // Start would silently restart the timer instead of doing nothing
+  const showForm = timers.length === 0 || editing;
+
+  async function run(next: number | null, lights?: number[]) {
     setBusy(true);
     try {
-      const result = await lightsApi.sleep(next, fade, id);
+      const result = await lightsApi.sleep(next, fade, lights);
       if (next !== null && result.armed === 0) {
         onFailure("No light is on.");
       }
@@ -52,6 +89,7 @@ export function SleepTimer({ timers, onFailure, onChanged }: SleepTimerProps) {
             : `${result.failed.length} lights did not take the timer.`,
         );
       }
+      setEditing(false);
       onChanged();
     } catch {
       onFailure("The lights could not be reached.");
@@ -63,87 +101,96 @@ export function SleepTimer({ timers, onFailure, onChanged }: SleepTimerProps) {
   return (
     <Block title="Sleep timer">
       {timers.length > 0 && (
-        <ul className="mb-4 flex flex-col divide-y divide-ui-border-soft">
+        <ul className="flex flex-col gap-2">
           {timers.map((timer) => (
             <li
-              key={timer.light_id}
-              className="flex flex-wrap items-center gap-3 py-2 first:pt-0"
+              key={timer.lights.join("-")}
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-ui-border-soft bg-ui-surface p-3"
             >
               <Icon
                 name="clock"
-                className="size-4 shrink-0 text-[var(--accent)]"
+                className="size-5 shrink-0 text-[var(--accent)]"
               />
-              <span className="min-w-0 flex-1 truncate text-sm text-ui-fg">
-                {timer.name}
-                <span className="ml-2 text-ui-fg-muted tabular-nums">
-                  off in {remainingLabel(timer.sleep_in)}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ui-fg">
+                  {timer.name}
                 </span>
+                <span className="block text-xs text-ui-fg-muted">
+                  {timer.fade
+                    ? "dimming down the whole time"
+                    : "switches off at the end"}
+                </span>
+              </span>
+              <span className="text-lg text-ui-fg tabular-nums">
+                {remainingLabel(left(timer.sleep_in))}
               </span>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => run(null, timer.light_id)}
-                className={buttonClass}
+                onClick={() => run(null, timer.lights)}
+                className={`${buttonClass} h-10 w-full px-5 sm:w-auto`}
               >
                 Stop
               </button>
             </li>
           ))}
-          {timers.length > 1 && (
-            <li className="flex justify-end pt-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => run(null)}
-                className={buttonClass}
-              >
-                Stop all
-              </button>
-            </li>
-          )}
         </ul>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-0 flex-col gap-1">
-          <span className="text-xs text-ui-fg-muted">Minutes</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={minSleepMinutes}
-            max={maxSleepMinutes}
-            value={minutes}
-            onChange={(event) => setMinutes(event.target.value)}
-            className={`${inputClass} w-24 tabular-nums`}
-          />
-        </label>
+      {showForm ? (
+        <>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-xs text-ui-fg-muted">Minutes</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={minSleepMinutes}
+                max={maxSleepMinutes}
+                value={minutes}
+                onChange={(event) => setMinutes(event.target.value)}
+                className={`${inputClass} w-24 tabular-nums`}
+              />
+            </label>
 
-        <label className="flex items-center gap-2 pb-2 text-sm text-ui-fg-muted">
-          <input
-            type="checkbox"
-            checked={fade}
-            onChange={(event) => setFade(event.target.checked)}
-            className="size-4 accent-ctp-mauve"
-          />
-          Fade out slowly
-        </label>
+            <label className="flex items-center gap-2 pb-2 text-sm text-ui-fg-muted">
+              <input
+                type="checkbox"
+                checked={fade}
+                onChange={(event) => setFade(event.target.checked)}
+                className="size-4 accent-ctp-mauve"
+              />
+              Fade out slowly
+            </label>
 
+            <button
+              type="button"
+              disabled={busy || !valid}
+              onClick={() => run(wanted)}
+              className={`${primaryButtonClass} ml-auto inline-flex items-center gap-1.5`}
+            >
+              <Icon name="power" className="size-4" />
+              {busy ? "Arming…" : timers.length > 0 ? "Replace" : "Start"}
+            </button>
+          </div>
+
+          <p className="mt-2 text-xs text-ui-fg-faint">
+            {minSleepMinutes} to {maxSleepMinutes} minutes. A fade dims the
+            strips down over the whole time and reaches nothing at the end;
+            without it they stay bright and drop out at once. Plugs cannot dim
+            either way. The countdown runs on the devices, so it keeps going
+            when this page is closed.
+          </p>
+        </>
+      ) : (
         <button
           type="button"
-          disabled={busy || !valid}
-          onClick={() => run(wanted)}
-          className={`${primaryButtonClass} ml-auto inline-flex items-center gap-1.5`}
+          onClick={() => setEditing(true)}
+          className={`${buttonClass} mt-3`}
         >
-          <Icon name="power" className="size-4" />
-          {busy ? "Arming…" : "Start"}
+          New timer
         </button>
-      </div>
-
-      <p className="mt-2 text-xs text-ui-fg-faint">
-        {minSleepMinutes} to {maxSleepMinutes} minutes. The countdown runs on
-        the devices, so it keeps going when this page is closed. Plugs cannot
-        dim and simply switch off at the end.
-      </p>
+      )}
     </Block>
   );
 }

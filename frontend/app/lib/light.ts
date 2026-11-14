@@ -250,9 +250,10 @@ export const scenes: { value: Scene; label: string }[] = [
 
 export type SceneResult = { scene: Scene; changed: number; failed: number[] };
 export type SleepTimerEntry = {
-  light_id: number;
+  lights: number[];
   name: string;
   sleep_in: number;
+  fade: boolean;
 };
 export type SceneStatus = {
   scene: Scene | "";
@@ -301,13 +302,13 @@ export const lightsApi = {
     }
   },
 
-  async sleep(minutes: number | null, fade = false, id?: number) {
+  async sleep(minutes: number | null, fade = false, lights?: number[]) {
     let res: Response;
     try {
       res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sleep: { minutes, fade, id } }),
+        body: JSON.stringify({ sleep: { minutes, fade, lights } }),
       });
     } catch {
       throw new LightRequestError("unreachable_backend", 0);

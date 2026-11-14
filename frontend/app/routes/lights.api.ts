@@ -79,7 +79,7 @@ export async function action({ request }: Route.ActionArgs) {
     id?: unknown;
     change?: unknown;
     scene?: unknown;
-    sleep?: { minutes?: unknown; fade?: unknown; id?: unknown };
+    sleep?: { minutes?: unknown; fade?: unknown; lights?: unknown };
   } | null;
 
   // a null duration cancels; the timer itself runs on the devices
@@ -101,7 +101,9 @@ export async function action({ request }: Route.ActionArgs) {
         body: JSON.stringify({
           minutes,
           fade: body.sleep.fade === true,
-          id: lightId(body.sleep.id) ?? 0,
+          lights: Array.isArray(body.sleep.lights)
+            ? body.sleep.lights.map(lightId).filter((id) => id !== null)
+            : [],
         }),
         signal: AbortSignal.timeout(sceneTimeoutMs),
       }),

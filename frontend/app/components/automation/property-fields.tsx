@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
+import { DatePicker } from "../date-picker";
 import { Icon } from "../icons";
 import { inputClass } from "../setting-row";
+import { TimeInput } from "../time-input";
 import {
   codeAreaClass,
   iconButtonClass,
@@ -235,15 +237,7 @@ function Control(props: ControlProps) {
         <MultiControl property={property} value={value} onChange={onChange} />
       );
     case "dateTime":
-      return (
-        <input
-          id={id}
-          type="datetime-local"
-          className={inputClass}
-          value={typeof value === "string" ? value.slice(0, 16) : ""}
-          onChange={(event) => onChange(event.target.value || undefined)}
-        />
-      );
+      return <DateTimeControl id={id} value={value} onChange={onChange} />;
     case "color":
       return (
         <div className="flex items-center gap-2">
@@ -359,6 +353,23 @@ function NumberControl({ id, property, value, onChange }: { id: string; property
         onChange(event.target.value === "" ? undefined : Number(event.target.value))
       }
     />
+  );
+}
+
+function DateTimeControl({ id, value, onChange }: { id: string; value: unknown; onChange: (value: unknown) => void }) {
+  const stamp = typeof value === "string" ? value.slice(0, 16) : "";
+  const day = stamp.slice(0, 10);
+  const time = stamp.slice(11, 16) || "00:00";
+
+  function set(nextDay: string, nextTime: string) {
+    onChange(nextDay ? `${nextDay}T${nextTime}` : undefined);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <DatePicker value={day} onChange={(next) => set(next, time)} />
+      <TimeInput id={id} value={time} onChange={(next) => set(day, next)} />
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -190,19 +191,21 @@ type Status struct {
 	Off   []int64 `json:"off"`
 	// seconds until the lights switch themselves off, 0 when nothing is armed
 	SleepIn int `json:"sleep_in"`
-	// one entry per light that is running a countdown right now
+	// the countdowns running right now, lights started together as one entry
 	Timers []Timer `json:"timers"`
 }
 
 type Timer struct {
-	LightID int64  `json:"light_id"`
-	Name    string `json:"name"`
-	SleepIn int    `json:"sleep_in"`
+	Lights  []int64 `json:"lights"`
+	Name    string  `json:"name"`
+	SleepIn int     `json:"sleep_in"`
+	Fade    bool    `json:"fade"`
 }
 
 type reading struct {
 	on    bool
 	sleep int
+	fade  bool
 }
 
 // the broad scenes are checked first: with only wled devices "all" and "led"
@@ -223,6 +226,7 @@ func Current(userID int64) (*Status, error) {
 	actual := readStates(list, stored)
 
 	status := &Status{On: []int64{}, Off: []int64{}, Timers: []Timer{}}
+	var running []Timer
 	for _, light := range list {
 		found, known := actual[light.ID]
 		if !known {
@@ -239,18 +243,54 @@ func Current(userID int64) (*Status, error) {
 		if found.sleep > status.SleepIn {
 			status.SleepIn = found.sleep
 		}
-		status.Timers = append(status.Timers, Timer{
-			LightID: light.ID,
+		running = append(running, Timer{
+			Lights:  []int64{light.ID},
 			Name:    light.Name,
 			SleepIn: found.sleep,
+			Fade:    found.fade,
 		})
 	}
+	status.Timers = groupTimers(running, len(list))
 
 	if len(actual) == len(list) && len(list) > 0 {
 		status.Scene = matchScene(list, stored, actual)
 	}
 
 	return status, nil
+}
+
+// countdowns armed in one go drift by a second or two on the devices, so
+// anything this close together is the same timer and gets one entry
+const timerSpread = 90
+
+// groupTimers folds the per-light countdowns into the batches the user started.
+func groupTimers(running []Timer, lights int) []Timer {
+	slices.SortFunc(running, func(a, b Timer) int { return b.SleepIn - a.SleepIn })
+
+	groups := []Timer{}
+	for _, timer := range running {
+		last := len(groups) - 1
+		if last >= 0 && groups[last].Fade == timer.Fade &&
+			groups[last].SleepIn-timer.SleepIn <= timerSpread {
+			groups[last].Lights = append(groups[last].Lights, timer.Lights...)
+			continue
+		}
+		groups = append(groups, timer)
+	}
+
+	for index := range groups {
+		count := len(groups[index].Lights)
+		if count == 1 {
+			continue
+		}
+		if count == lights {
+			groups[index].Name = "All lights"
+			continue
+		}
+		groups[index].Name = strconv.Itoa(count) + " lights"
+	}
+
+	return groups
 }
 
 // an unreachable light is left out of the map, so a scene is only reported
@@ -292,6 +332,7 @@ func readLight(light Light, kind string) (reading, error) {
 			return reading{}, err
 		}
 
+		// a relay has nothing to dim, so its countdown never fades
 		return reading{on: state.On, sleep: int(state.Remaining.Seconds())}, nil
 	}
 
@@ -303,6 +344,7 @@ func readLight(light Light, kind string) (reading, error) {
 	found := reading{on: state.On}
 	if state.Nightlight.On && state.Nightlight.Remaining > 0 {
 		found.sleep = state.Nightlight.Remaining
+		found.fade = state.Nightlight.Mode == nightlightFade
 	}
 
 	return found, nil
@@ -393,19 +435,20 @@ func StartSleep(userID int64, minutes int, fade bool) (*Sleep, error) {
 	return result, nil
 }
 
-// CancelSleep clears the countdown on every light, or on one when an id is
-// given: starting a timer by accident must be undoable without going dark.
-func CancelSleep(userID int64, only int64) (*Sleep, error) {
+// CancelSleep clears the countdown on every light, or on the ones listed:
+// starting a timer by accident must be undoable without going dark.
+func CancelSleep(userID int64, only []int64) (*Sleep, error) {
 	list, err := List(userID)
 	if err != nil {
 		return nil, err
 	}
-	if only > 0 {
-		light, err := byID(userID, only)
-		if err != nil {
-			return nil, err
+	if len(only) > 0 {
+		list = slices.DeleteFunc(list, func(light Light) bool {
+			return !slices.Contains(only, light.ID)
+		})
+		if len(list) == 0 {
+			return nil, ErrNotFound
 		}
-		list = []Light{*light}
 	}
 
 	stored, err := store.LightProfilesByOwner(db.DB, userID)

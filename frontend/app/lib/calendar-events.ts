@@ -33,7 +33,18 @@ export type CalendarEvent = {
   cancelled?: boolean;
 };
 
-export type EventDraft = Omit<CalendarEvent, "id"> & { id?: string };
+export type EventRepeat = "" | "weekly";
+
+export const minRepeatWeeks = 2;
+export const maxRepeatWeeks = 52;
+
+export type EventDraft = Omit<CalendarEvent, "id"> & {
+  id?: string;
+  // only read when the event is new: a weekly event is written out as one
+  // entry per week, which the server groups back together by title and time
+  repeat?: EventRepeat;
+  repeatWeeks?: number;
+};
 
 export type CategoryDraft = Omit<CalendarCategory, "id"> & { id?: string };
 
@@ -65,6 +76,7 @@ const errorMessages: Record<string, string> = {
   invalid_event: "Check the title, date and times.",
   invalid_category: "The name or the color is not valid.",
   invalid_mark: "This mark is not valid.",
+  invalid_repeat: `Repeat between ${minRepeatWeeks} and ${maxRepeatWeeks} weeks.`,
   protected: "The DHBW timetable category cannot be deleted.",
   not_found: "This entry no longer exists.",
 };
@@ -136,13 +148,15 @@ export const calendarApi = {
         room: draft.room,
         description: draft.description,
         mark: draft.mark,
+        repeat: draft.repeat ?? "",
+        repeat_weeks: draft.repeatWeeks ?? 0,
       },
     });
     return fromItem(item);
   },
 
-  deleteEvent(id: string) {
-    return send({ intent: "delete-event", id });
+  deleteEvent(id: string, series = false) {
+    return send({ intent: "delete-event", id, series });
   },
 
   setMark(event: CalendarEvent, mark: EventMark) {

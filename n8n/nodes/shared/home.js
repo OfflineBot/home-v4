@@ -20,6 +20,30 @@ const sourceOptions = [
   { name: "All Events", value: "all" },
 ];
 
+// A weekly event is a set of plain entries that share title, weekday and
+// time, and the series key spells that out. A key without a weekday means
+// "every event with this title", whichever day it falls on.
+async function listEventSeries() {
+  const data = await call(this, "GET", "/api/integration/calendar/series");
+
+  return (data.series || []).map((series) => ({
+    name: series.weekday
+      ? `${series.title} · ${series.weekday.slice(0, 3)} ${series.start_time}–${series.end_time}`
+      : `${series.title} · every weekday it happens`,
+    value: series.key,
+    description: series.next
+      ? `${series.count} in the calendar, next on ${series.next.slice(0, 16).replace("T", " ")}`
+      : `${series.count} in the calendar, none coming up`,
+  }));
+}
+
+function matchesSeries(event, key) {
+  const parts = String(key).split("|");
+  if (parts.length < 3) return event.title === parts[0];
+
+  return event.title === parts[0] && event.weekday === parts[1] && event.start_time === parts[2];
+}
+
 async function listMachines() {
   const data = await call(this, "GET", "/api/integration/machines");
   return (data.machines || []).map((machine) => ({
@@ -70,6 +94,8 @@ function dayQuery(context, index) {
 module.exports = {
   call,
   sourceOptions,
+  listEventSeries,
+  matchesSeries,
   listMachines,
   listLights,
   listPresets,

@@ -205,9 +205,9 @@ export default function Calendar({ loaderData }: Route.ComponentProps) {
     }
   }
 
-  async function deleteEvent(id: string) {
+  async function deleteEvent(id: string, series = false) {
     try {
-      await calendarApi.deleteEvent(id);
+      await calendarApi.deleteEvent(id, series);
       setDraft(null);
       refresh();
     } catch (error) {

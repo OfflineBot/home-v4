@@ -1,15 +1,26 @@
-const { call, sourceOptions } = require("../../shared/home");
+const { call, sourceOptions, listEventSeries, matchesSeries } = require("../../shared/home");
 
 const keepMs = 3 * 24 * 60 * 60 * 1000;
 const firstPollMs = 90 * 1000;
 
-function targets(days, moment, minutes) {
+function targets(days, moment, minutes, series) {
   const offset = minutes * 60 * 1000;
   const list = [];
 
   for (const day of days) {
     const events = day.events || [];
     if (events.length === 0) continue;
+
+    if (moment === "afterEvent" || moment === "beforeEvent") {
+      for (const event of events) {
+        if (!matchesSeries(event, series)) continue;
+        const at =
+          moment === "afterEvent"
+            ? Date.parse(event.end) + offset
+            : Date.parse(event.start) - offset;
+        list.push({ key: `${moment}:${event.id}:${event.start}`, at, event, day });
+      }
+    }
 
     if (moment === "beforeFirst" && day.first) {
       list.push({ key: `first:${day.date}:${day.first.id}`, at: Date.parse(day.first.start) - offset, event: day.first, day });
@@ -35,7 +46,7 @@ class HomeV4TimetableTrigger {
       icon: "file:timetable.svg",
       group: ["trigger"],
       version: 1,
-      description: "Starts the workflow before or after your events, for example 45 minutes before the first lecture",
+      description: "Starts the workflow before or after your events, for example 45 minutes before the first lecture or 10 minutes after work",
       subtitle: '={{$parameter["moment"]}}',
       defaults: { name: "Timetable Trigger" },
       polling: true,
@@ -51,8 +62,20 @@ class HomeV4TimetableTrigger {
             { name: "Before the First Event of the Day", value: "beforeFirst" },
             { name: "Before Every Event", value: "beforeEach" },
             { name: "After the Last Event of the Day", value: "afterLast" },
+            { name: "After a Chosen Event", value: "afterEvent" },
+            { name: "Before a Chosen Event", value: "beforeEvent" },
           ],
           default: "beforeFirst",
+        },
+        {
+          displayName: "Event",
+          name: "series",
+          type: "options",
+          typeOptions: { loadOptionsMethod: "getEventSeries" },
+          default: "",
+          required: true,
+          description: "One of your own events, for example the work block you put in every Thursday",
+          displayOptions: { show: { moment: ["afterEvent", "beforeEvent"] } },
         },
         {
           displayName: "Minutes",
@@ -60,7 +83,7 @@ class HomeV4TimetableTrigger {
           type: "number",
           typeOptions: { minValue: 0, maxValue: 720 },
           default: 30,
-          description: "How many minutes before the start, or after the end for the last event",
+          description: "How many minutes before the start, or after the end when the trigger waits for an event to finish",
         },
         {
           displayName: "Events",
@@ -68,6 +91,7 @@ class HomeV4TimetableTrigger {
           type: "options",
           options: sourceOptions,
           default: "timetable",
+          displayOptions: { hide: { moment: ["afterEvent", "beforeEvent"] } },
         },
         {
           displayName: "Include Cancelled Events",
@@ -77,20 +101,26 @@ class HomeV4TimetableTrigger {
         },
       ],
     };
+
+    this.methods = { loadOptions: { getEventSeries: listEventSeries } };
   }
 
   async poll() {
     const moment = this.getNodeParameter("moment");
     const minutes = this.getNodeParameter("minutes");
+    const chosen = moment === "afterEvent" || moment === "beforeEvent";
+    const series = chosen ? String(this.getNodeParameter("series")) : "";
     const qs = {
-      source: this.getNodeParameter("source"),
+      // a chosen event is one of the user's own, so the timetable filter is
+      // dropped instead of hiding the very event that was picked
+      source: chosen ? "all" : this.getNodeParameter("source"),
       cancelled: String(this.getNodeParameter("includeCancelled")),
     };
 
     const days = await Promise.all(
       ["today", "tomorrow"].map((day) => call(this, "GET", "/api/integration/calendar/day", { qs: { ...qs, day } })),
     );
-    const found = targets(days, moment, minutes).sort((a, b) => a.at - b.at);
+    const found = targets(days, moment, minutes, series).sort((a, b) => a.at - b.at);
     const now = Date.now();
 
     if (this.getMode() === "manual") {

@@ -17,10 +17,13 @@ import { TimeInput } from "../time-input";
 import { dayLong, formatTime, parseDay } from "../../lib/calendar";
 import {
   eventMarks,
+  maxRepeatWeeks,
+  minRepeatWeeks,
   type CalendarCategory,
   type CalendarEvent,
   type EventDraft,
   type EventMark,
+  type EventRepeat,
 } from "../../lib/calendar-events";
 import { matchCourse, type CourseRef } from "../../lib/moodle";
 import { accentVars } from "../../lib/nav";
@@ -31,9 +34,11 @@ type EventDialogProps = {
   courses: CourseRef[];
   onClose: () => void;
   onSave: (draft: EventDraft) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string, series?: boolean) => Promise<void>;
   onMark: (event: CalendarEvent, mark: EventMark) => Promise<void>;
 };
+
+const defaultRepeatWeeks = 12;
 
 function hourAfter(time: string) {
   const [hours, minutes] = time.split(":").map(Number);
@@ -216,7 +221,7 @@ type EventFormProps = {
   categories: CalendarCategory[];
   onCancel: () => void;
   onSave: (draft: EventDraft) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string, series?: boolean) => Promise<void>;
 };
 
 function EventForm({
@@ -239,14 +244,23 @@ function EventForm({
   const [room, setRoom] = useState(draft.room);
   const [description, setDescription] = useState(draft.description);
   const [mark, setMark] = useState(draft.mark);
+  const [repeat, setRepeat] = useState<EventRepeat>("");
+  const [weeks, setWeeks] = useState(String(defaultRepeatWeeks));
   const [busy, setBusy] = useState(false);
   const invalidTime = end <= start;
+  const invalidWeeks =
+    repeat === "weekly" &&
+    !(
+      Number.isInteger(Number(weeks)) &&
+      Number(weeks) >= minRepeatWeeks &&
+      Number(weeks) <= maxRepeatWeeks
+    );
   const color =
     editable.find((category) => category.id === categoryId)?.color ?? "blue";
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (invalidTime || !categoryId) return;
+    if (invalidTime || invalidWeeks || !categoryId) return;
 
     setBusy(true);
     try {
@@ -260,16 +274,18 @@ function EventForm({
         room: room.trim(),
         description: description.trim(),
         mark,
+        repeat,
+        repeatWeeks: Number(weeks),
       });
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove(id: string) {
+  async function remove(id: string, series: boolean) {
     setBusy(true);
     try {
-      await onDelete(id);
+      await onDelete(id, series);
     } finally {
       setBusy(false);
     }
@@ -372,12 +388,46 @@ function EventForm({
         />
       </Field>
 
+      {!draft.id && (
+        <div className={fieldGridClass}>
+          <Field label="Repeats">
+            <select
+              value={repeat}
+              onChange={(event) => setRepeat(event.target.value as EventRepeat)}
+              className={inputClass}
+            >
+              <option value="">Once</option>
+              <option value="weekly">Every week</option>
+            </select>
+          </Field>
+          {repeat === "weekly" && (
+            <Field label="Weeks">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={minRepeatWeeks}
+                max={maxRepeatWeeks}
+                value={weeks}
+                onChange={(event) => setWeeks(event.target.value)}
+                className={`${inputClass} tabular-nums`}
+              />
+            </Field>
+          )}
+        </div>
+      )}
+
       <MarkPicker value={mark} onChange={setMark} />
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="submit"
-          disabled={busy || invalidTime || title.trim() === "" || !categoryId}
+          disabled={
+            busy ||
+            invalidTime ||
+            invalidWeeks ||
+            title.trim() === "" ||
+            !categoryId
+          }
           className={primaryButtonClass}
         >
           Save
@@ -386,14 +436,25 @@ function EventForm({
           Cancel
         </button>
         {draft.id && (
-          <button
-            type="button"
-            onClick={() => remove(draft.id!)}
-            disabled={busy}
-            className={`${dangerButtonClass} ml-auto`}
-          >
-            Delete
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => remove(draft.id!, false)}
+              disabled={busy}
+              className={`${dangerButtonClass} ml-auto`}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => remove(draft.id!, true)}
+              disabled={busy}
+              title="Removes this one and every later event with the same title and time"
+              className={dangerButtonClass}
+            >
+              Delete series
+            </button>
+          </>
         )}
       </div>
     </form>

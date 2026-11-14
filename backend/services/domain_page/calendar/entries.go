@@ -45,6 +45,10 @@ type EventInput struct {
 	Room        string `json:"room"`
 	Description string `json:"description"`
 	Mark        string `json:"mark"`
+	// "weekly" writes the event once a week for RepeatWeeks weeks; the
+	// occurrences are plain entries that share title, weekday and time
+	Repeat      string `json:"repeat"`
+	RepeatWeeks int    `json:"repeat_weeks"`
 }
 
 type CategoryInput struct {
@@ -66,6 +70,14 @@ const (
 	MarkNormal          = "normal"
 	MarkImportant       = "important"
 	MarkHidden          = "hidden"
+	RepeatNever  = ""
+	RepeatWeekly = "weekly"
+
+	minRepeatWeeks = 2
+	maxRepeatWeeks = 52
+	seriesAhead    = 400
+	seriesBack     = 30
+
 	timetableCategoryID = "timetable"
 	timetableName       = "Uni"
 	timetableColor      = "blue"
@@ -90,6 +102,7 @@ var (
 	ErrInvalidMark     = errors.New("invalid calendar mark")
 	ErrInvalidFilter   = errors.New("invalid calendar filter")
 	ErrProtected       = errors.New("calendar item is managed by a sync")
+	ErrInvalidRepeat   = errors.New("invalid repeat")
 )
 
 func Categories(userID int64) ([]Category, error) {
@@ -203,16 +216,85 @@ func SaveEvent(userID int64, in EventInput) (*Item, error) {
 		return nil, err
 	}
 
+	if in.ID == "" && in.Repeat == RepeatWeekly {
+		if err := repeatWeekly(userID, *entry, in.RepeatWeeks); err != nil {
+			return nil, err
+		}
+	}
+
 	item := fromEntry(*entry)
 	return &item, nil
 }
 
-func DeleteEvent(userID int64, id string) error {
+// repeatWeekly writes the remaining occurrences as ordinary entries. They are
+// not tied together by a column: sharing title, weekday and time is what makes
+// them one series, which keeps every read path untouched.
+func repeatWeekly(userID int64, first store.CalendarEntry, weeks int) error {
+	for week := 1; week < weeks; week++ {
+		next := first
+		next.ID = newID()
+		next.Start = shiftWeeks(first.Start, week)
+		next.End = shiftWeeks(first.End, week)
+		if next.Start == "" || next.End == "" {
+			return ErrInvalidEvent
+		}
+
+		if err := store.SaveCalendarEntry(db.DB, userID, next); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// AddDate keeps the wall clock, so an occurrence stays at 17:00 across a
+// daylight saving change instead of sliding by an hour.
+func shiftWeeks(stored string, weeks int) string {
+	at, err := time.Parse(time.RFC3339, stored)
+	if err != nil {
+		return ""
+	}
+
+	loc := timetable.Location()
+	return stamp(at.In(loc).AddDate(0, 0, weeks*daysPerWeek))
+}
+
+// DeleteEvent removes one occurrence, or every later one of its series.
+func DeleteEvent(userID int64, id string, series bool) error {
 	if err := customExists(userID, id); err != nil {
 		return err
 	}
+	if !series {
+		return store.DeleteCalendarEntry(db.DB, userID, id)
+	}
 
-	return store.DeleteCalendarEntry(db.DB, userID, id)
+	entry, err := store.CalendarEntryByID(db.DB, userID, id)
+	if err != nil {
+		return err
+	}
+
+	from, err := time.Parse(time.RFC3339, entry.Start)
+	if err != nil {
+		return ErrInvalidEvent
+	}
+
+	later, err := store.CalendarEntries(db.DB, userID,
+		stamp(from), stamp(from.AddDate(0, 0, seriesAhead)))
+	if err != nil {
+		return err
+	}
+
+	key := seriesKeyOf(*entry)
+	for _, other := range later {
+		if seriesKeyOf(other) != key {
+			continue
+		}
+		if err := store.DeleteCalendarEntry(db.DB, userID, other.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func SetMark(userID int64, id string, mark *string) error {
@@ -312,6 +394,13 @@ func customExists(userID int64, id string) error {
 }
 
 func validEntry(in EventInput) (*store.CalendarEntry, error) {
+	if in.Repeat != RepeatNever && in.Repeat != RepeatWeekly {
+		return nil, ErrInvalidRepeat
+	}
+	if in.Repeat == RepeatWeekly && (in.RepeatWeeks < minRepeatWeeks || in.RepeatWeeks > maxRepeatWeeks) {
+		return nil, ErrInvalidRepeat
+	}
+
 	title := strings.TrimSpace(in.Title)
 	if title == "" || utf8.RuneCountInString(title) > maxTitle ||
 		utf8.RuneCountInString(in.Room) > maxTitle || utf8.RuneCountInString(in.Description) > maxText {

@@ -40,6 +40,8 @@ func calendarResult(c fiber.Ctx, err error) error {
 		return calendarError(c, fiber.StatusBadRequest, "invalid_event")
 	case errors.Is(err, calendar.ErrInvalidCategory):
 		return calendarError(c, fiber.StatusBadRequest, "invalid_category")
+	case errors.Is(err, calendar.ErrInvalidRepeat):
+		return calendarError(c, fiber.StatusBadRequest, "invalid_repeat")
 	case errors.Is(err, calendar.ErrInvalidMark):
 		return calendarError(c, fiber.StatusBadRequest, "invalid_mark")
 	case errors.Is(err, calendar.ErrProtected):
@@ -93,7 +95,9 @@ func calendarSaveEvent(c fiber.Ctx) error {
 func calendarDeleteEvent(c fiber.Ctx) error {
 	user := fiber.Locals[*auth.User](c, auth.ContextKey)
 
-	if err := calendar.DeleteEvent(user.ID, c.Params("id")); err != nil {
+	series := c.Query("series") == "true"
+
+	if err := calendar.DeleteEvent(user.ID, c.Params("id"), series); err != nil {
 		return calendarResult(c, err)
 	}
 

@@ -291,11 +291,17 @@ func startLightSleep(c fiber.Ctx) error {
 
 func cancelLightSleep(c fiber.Ctx) error {
 	var body struct {
-		ID int64 `json:"id"`
+		ID     int64   `json:"id"`
+		Lights []int64 `json:"lights"`
 	}
 	_ = c.Bind().JSON(&body)
 
-	result, err := lights.CancelSleep(lightUser(c), body.ID)
+	only := body.Lights
+	if body.ID > 0 {
+		only = append(only, body.ID)
+	}
+
+	result, err := lights.CancelSleep(lightUser(c), only)
 	if err != nil {
 		return lightResult(c, err)
 	}

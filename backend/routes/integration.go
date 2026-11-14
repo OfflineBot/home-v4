@@ -41,6 +41,7 @@ func integrationRouter(r fiber.Router) {
 		Get("/me", integrationMe).
 		Get("/calendar/day", integrationDay).
 		Get("/calendar/upcoming", integrationUpcoming).
+		Get("/calendar/series", integrationSeries).
 		Get("/machines", integrationMachines).
 		Post("/machines/:id/wake", integrationWake).
 		Get("/machines/:id/status", integrationMachineStatus).
@@ -137,6 +138,15 @@ func integrationDay(c fiber.Ctx) error {
 	}
 
 	return c.JSON(summary)
+}
+
+func integrationSeries(c fiber.Ctx) error {
+	list, err := calendar.SeriesList(integrationUser(c), time.Now())
+	if err != nil {
+		return integrationResult(c, err)
+	}
+
+	return c.JSON(fiber.Map{"series": list})
 }
 
 func integrationUpcoming(c fiber.Ctx) error {

@@ -44,7 +44,10 @@ function target(body: Record<string, unknown>) {
     case "save-event":
       return { path: `${base}/events`, payload: body.event };
     case "delete-event":
-      return { path: `${base}/events/${id}/delete`, payload: {} };
+      return {
+        path: `${base}/events/${id}/delete${body.series === true ? "?series=true" : ""}`,
+        payload: {},
+      };
     case "mark-event":
       return { path: `${base}/events/${id}/mark`, payload: { mark: body.mark } };
     case "save-category":
