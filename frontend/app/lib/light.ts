@@ -242,10 +242,10 @@ export const kinds: { value: Kind; label: string; hint: string }[] = [
 ];
 
 export const scenes: { value: Scene; label: string }[] = [
-  { value: "all", label: "All lights" },
-  { value: "off", label: "All lights off" },
-  { value: "led", label: "LED only" },
-  { value: "no_led", label: "No LED only" },
+  { value: "all", label: "Lights On" },
+  { value: "off", label: "Lights Off" },
+  { value: "led", label: "LED" },
+  { value: "no_led", label: "No LED" },
 ];
 
 export type SceneResult = { scene: Scene; changed: number; failed: number[] };

@@ -146,8 +146,8 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
 
 const refreshMs = 60_000;
 
-// Everything, then the two halves: "all lights off" and "no LED only" read
-// alike but do opposite things, so a rule keeps them apart.
+// Everything, then the two halves: "Lights Off" and "No LED" read alike but do
+// opposite things, so a rule keeps them apart.
 const sceneGroups: Scene[][] = [
   ["all", "off"],
   ["led", "no_led"],
