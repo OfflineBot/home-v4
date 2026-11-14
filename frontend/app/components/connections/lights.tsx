@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useFetcher } from "react-router";
 import { ExpandableBlock } from "../block";
 import { Icon } from "../icons";
@@ -74,8 +75,9 @@ export function LightsConnection({ lights, profiles }: LightsConnectionProps) {
   );
 }
 
-// One device, one row. The kind and the scenes save on change, so there is no
-// button to hunt for; an empty scene set means the device follows its kind.
+// One device, one row, closed until it is needed: twenty lights have to stay
+// a list you can scan. The kind and the scenes save on change, and an empty
+// scene set means the device follows its kind.
 function LightRow({
   light,
   profile,
@@ -84,32 +86,57 @@ function LightRow({
   profile?: LightProfile;
 }) {
   const fetcher = useFetcher();
+  const [open, setOpen] = useState(false);
   const kind = profile?.kind ?? "wled";
   const picked = profile?.scenes ?? [];
 
-  return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full border border-ui-border text-[var(--accent)]">
-          <Icon name="lights" className="size-5" />
-        </span>
+  const kindLabel = kinds.find((entry) => entry.value === kind)?.label ?? kind;
+  const sceneLabel =
+    picked.length === 0
+      ? "follows its kind"
+      : scenes
+          .filter((scene) => picked.includes(scene.value))
+          .map((scene) => scene.label)
+          .join(", ");
 
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-ui-fg">
-            {light.name}
+  return (
+    <li className="flex flex-col py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ui-ring"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-full border border-ui-border text-[var(--accent)]">
+            <Icon name="lights" className="size-5" />
           </span>
-          <span className="block truncate font-mono text-xs text-ui-fg-muted">
-            {lightAddress(light.url)}
+
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-ui-fg">
+              {light.name}
+            </span>
+            <span className="block truncate font-mono text-xs text-ui-fg-muted">
+              {lightAddress(light.url)} · {kindLabel} · {sceneLabel}
+            </span>
           </span>
-        </span>
+
+          <Icon
+            name="chevron"
+            className={`size-3.5 shrink-0 text-ui-fg-faint transition-transform motion-reduce:transition-none ${
+              open ? "rotate-90" : ""
+            }`}
+          />
+        </button>
 
         <RemoveDevice id={light.id} intent="delete-light" />
       </div>
 
       <fetcher.Form
         method="post"
+        hidden={!open}
         onChange={(event) => fetcher.submit(event.currentTarget)}
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-12"
+        className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 pl-12"
       >
         <input type="hidden" name="intent" value="set-light-profile" />
         <input type="hidden" name="id" value={light.id} />
@@ -142,10 +169,6 @@ function LightRow({
             {scene.label}
           </label>
         ))}
-
-        {picked.length === 0 && (
-          <span className="text-xs text-ui-fg-faint">follows its kind</span>
-        )}
       </fetcher.Form>
     </li>
   );

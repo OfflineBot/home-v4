@@ -180,3 +180,110 @@ func kindOf(userID, lightID int64) (string, error) {
 
 	return profileOf(lightID, stored).Kind, nil
 }
+
+// Status is which scene the room is in right now, read from the devices
+// themselves. Scene is empty when the lights match none of them.
+type Status struct {
+	Scene string  `json:"scene"`
+	On    []int64 `json:"on"`
+	Off   []int64 `json:"off"`
+}
+
+// the broad scenes are checked first: with only wled devices "all" and "led"
+// describe the same state, and "all" is what the user pressed
+var sceneOrder = []string{SceneOff, SceneAll, SceneLED, SceneNoLED}
+
+func Current(userID int64) (*Status, error) {
+	list, err := List(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stored, err := store.LightProfilesByOwner(db.DB, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	actual := readStates(list, stored)
+
+	status := &Status{On: []int64{}, Off: []int64{}}
+	for _, light := range list {
+		on, known := actual[light.ID]
+		if !known {
+			continue
+		}
+		if on {
+			status.On = append(status.On, light.ID)
+		} else {
+			status.Off = append(status.Off, light.ID)
+		}
+	}
+
+	if len(actual) == len(list) && len(list) > 0 {
+		status.Scene = matchScene(list, stored, actual)
+	}
+
+	return status, nil
+}
+
+// an unreachable light is left out of the map, so a scene is only reported
+// when every light could be asked
+func readStates(list []Light, stored map[int64]store.LightProfile) map[int64]bool {
+	states := map[int64]bool{}
+
+	var mutex sync.Mutex
+	var group sync.WaitGroup
+
+	for _, light := range list {
+		group.Add(1)
+		go func(light Light, kind string) {
+			defer group.Done()
+
+			on, err := lightOn(light, kind)
+			if err != nil {
+				return
+			}
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			states[light.ID] = on
+		}(light, profileOf(light.ID, stored).Kind)
+	}
+
+	group.Wait()
+
+	return states
+}
+
+func lightOn(light Light, kind string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+
+	if kind == KindShelly {
+		return shellyClient.Status(ctx, light.URL)
+	}
+
+	state, err := client.State(ctx, light.URL)
+	if err != nil {
+		return false, err
+	}
+
+	return state.On, nil
+}
+
+func matchScene(list []Light, stored map[int64]store.LightProfile, actual map[int64]bool) string {
+	for _, scene := range sceneOrder {
+		fits := true
+		for _, light := range list {
+			if wants(profileOf(light.ID, stored), scene) != actual[light.ID] {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			return scene
+		}
+	}
+
+	return ""
+}

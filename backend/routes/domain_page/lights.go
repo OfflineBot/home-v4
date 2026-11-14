@@ -24,6 +24,7 @@ func LightRouter(r fiber.Router) {
 		Post("/presets/delete", deleteLightPreset).
 		Get("/profiles", lightProfiles).
 		Post("/profile", setLightProfile).
+		Get("/scene", currentLightScene).
 		Post("/scene", applyLightScene)
 }
 
@@ -256,6 +257,15 @@ func setLightProfile(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func currentLightScene(c fiber.Ctx) error {
+	status, err := lights.Current(lightUser(c))
+	if err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.JSON(status)
 }
 
 func applyLightScene(c fiber.Ctx) error {

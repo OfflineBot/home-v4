@@ -247,6 +247,7 @@ export const scenes: { value: Scene; label: string }[] = [
 ];
 
 export type SceneResult = { scene: Scene; changed: number; failed: number[] };
+export type SceneStatus = { scene: Scene | ""; on: number[]; off: number[] };
 
 export const lightsApi = {
   state: (id: number) => get<LightState>("state", id),
@@ -268,6 +269,16 @@ export const lightsApi = {
     }
     return read<LightState>(res);
   },
+  async sceneStatus(): Promise<SceneStatus | null> {
+    try {
+      const res = await fetch(`${endpoint}?op=scene`);
+      if (!res.ok) return null;
+      return (await res.json()) as SceneStatus;
+    } catch {
+      return null;
+    }
+  },
+
   async scene(scene: Scene) {
     let res: Response;
     try {

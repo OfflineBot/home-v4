@@ -17,7 +17,10 @@ async function relay(res: Response) {
   const text = await res.text();
   return new Response(text || "{}", {
     status: res.status === 204 ? 200 : res.status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -25,6 +28,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const url = new URL(request.url);
   const op = url.searchParams.get("op") ?? "";
+
+  if (op === "scene") {
+    return relay(
+      await api(`${base}/scene`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(sceneTimeoutMs),
+      }),
+    );
+  }
+
   const id = lightId(url.searchParams.get("id"));
 
   if (!reads.has(op) || id === null) {

@@ -146,11 +146,33 @@ export function NoticesTile({ notices }: { notices: NoticeSummary }) {
 
 const refreshMs = 60_000;
 
+// Everything, then the two halves: "all lights off" and "no LED only" read
+// alike but do opposite things, so a rule keeps them apart.
+const sceneGroups: Scene[][] = [
+  ["all", "off"],
+  ["led", "no_led"],
+];
+
 export function LightsTile({ lights }: { lights: Light[] }) {
   const [busy, setBusy] = useState<Scene | null>(null);
+  const [active, setActive] = useState<Scene | null>(null);
   const [failure, setFailure] = useState({ attempt: 0, message: "" });
 
-  if (lights.length === 0) return null;
+  const empty = lights.length === 0;
+
+  // marks the scene the room is actually in, read back from the devices
+  useEffect(() => {
+    if (empty) return;
+    let live = true;
+    lightsApi.sceneStatus().then((status) => {
+      if (live) setActive(status?.scene ? status.scene : null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [empty]);
+
+  if (empty) return null;
 
   async function run(scene: Scene) {
     setBusy(scene);
@@ -172,6 +194,8 @@ export function LightsTile({ lights }: { lights: Light[] }) {
       }));
     } finally {
       setBusy(null);
+      const status = await lightsApi.sceneStatus();
+      setActive(status?.scene ? status.scene : null);
     }
   }
 
@@ -181,23 +205,38 @@ export function LightsTile({ lights }: { lights: Light[] }) {
         <Link to="/lights" className={`-m-2 rounded-lg p-2 ${linkClass}`}>
           <Heading>Lights</Heading>
         </Link>
-        <span className="mt-auto grid grid-cols-2 gap-2">
-          {scenes.map((scene) => (
-            <button
-              key={scene.value}
-              type="button"
-              disabled={busy !== null}
-              onClick={() => run(scene.value)}
-              className={`${
-                scene.value === "all" ? primaryButtonClass : buttonClass
-              } inline-flex h-12! items-center justify-center gap-2 text-sm`}
-            >
-              <Icon
-                name={scene.value === "off" ? "power" : "lights"}
-                className="size-5"
-              />
-              {scene.label}
-            </button>
+        <span className="mt-auto flex flex-col gap-2.5">
+          {sceneGroups.map((group, index) => (
+            <span key={group.join()} className="flex flex-col gap-2.5">
+              {index > 0 && (
+                <span className="h-px bg-ui-border-soft" aria-hidden />
+              )}
+              <span className="grid grid-cols-2 gap-2">
+                {group.map((value) => {
+                  const scene = scenes.find((entry) => entry.value === value);
+                  if (!scene) return null;
+
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={busy !== null}
+                      aria-pressed={active === value}
+                      onClick={() => run(value)}
+                      className={`${
+                        active === value ? primaryButtonClass : buttonClass
+                      } inline-flex h-12! items-center justify-center gap-2 text-sm`}
+                    >
+                      <Icon
+                        name={value === "off" ? "power" : "lights"}
+                        className="size-5"
+                      />
+                      {scene.label}
+                    </button>
+                  );
+                })}
+              </span>
+            </span>
           ))}
         </span>
       </div>
