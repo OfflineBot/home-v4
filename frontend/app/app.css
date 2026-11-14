@@ -80,6 +80,9 @@
   --ui-fg-faint: var(--ctp-subtext0);
   --ui-ring: var(--ctp-overlay2);
   --ui-danger: var(--ctp-red);
+  /* what is readable on top of an accent: the theme's darkest tone in mocha,
+     its lightest in latte, where the accents themselves are the dark ones */
+  --ui-on-accent: var(--ctp-crust);
   --accent-mix: 100%;
 }
 
@@ -98,6 +101,7 @@
   --ui-fg-faint: var(--ctp-subtext1);
   --ui-ring: var(--ctp-subtext0);
   --ui-danger: var(--ctp-red);
+  --ui-on-accent: var(--ctp-base);
   --accent-mix: 30%;
 }
 
@@ -142,6 +146,7 @@
   --color-ui-fg-faint: var(--ui-fg-faint);
   --color-ui-ring: var(--ui-ring);
   --color-ui-danger: var(--ui-danger);
+  --color-ui-on-accent: var(--ui-on-accent);
   --color-ctp-rosewater: var(--ctp-rosewater);
   --color-ctp-flamingo: var(--ctp-flamingo);
   --color-ctp-pink: var(--ctp-pink);

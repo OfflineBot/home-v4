@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Icon } from "../icons";
-import { buttonClass, primaryButtonClass } from "../setting-row";
 import { Toast } from "../toast";
 import { accentVars } from "../../lib/nav";
 import {
@@ -153,26 +152,24 @@ const sceneGroups: Scene[][] = [
   ["led", "no_led"],
 ];
 
+// Each scene carries its own colour, so the row is read by looking rather
+// than by reading: light in colour, the theme's black for off, the plugs in
+// yellow and the strips in neon.
+const sceneLook: Record<Scene, string> = {
+  all: "bg-linear-to-br from-ctp-peach via-ctp-yellow to-ctp-green text-ui-on-accent",
+  off: "bg-ctp-crust text-ui-fg border border-ui-border-soft",
+  led: "bg-linear-to-br from-ctp-mauve to-ctp-teal text-ui-on-accent",
+  no_led: "bg-ctp-yellow text-ui-on-accent",
+};
+
+const sceneButtonClass =
+  "inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-medium transition hover:brightness-110 active:brightness-95 disabled:cursor-default disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring";
+
 export function LightsTile({ lights }: { lights: Light[] }) {
   const [busy, setBusy] = useState<Scene | null>(null);
-  const [active, setActive] = useState<Scene | null>(null);
   const [failure, setFailure] = useState({ attempt: 0, message: "" });
 
-  const empty = lights.length === 0;
-
-  // marks the scene the room is actually in, read back from the devices
-  useEffect(() => {
-    if (empty) return;
-    let live = true;
-    lightsApi.sceneStatus().then((status) => {
-      if (live) setActive(status?.scene ? status.scene : null);
-    });
-    return () => {
-      live = false;
-    };
-  }, [empty]);
-
-  if (empty) return null;
+  if (lights.length === 0) return null;
 
   async function run(scene: Scene) {
     setBusy(scene);
@@ -194,8 +191,6 @@ export function LightsTile({ lights }: { lights: Light[] }) {
       }));
     } finally {
       setBusy(null);
-      const status = await lightsApi.sceneStatus();
-      setActive(status?.scene ? status.scene : null);
     }
   }
 
@@ -221,11 +216,8 @@ export function LightsTile({ lights }: { lights: Light[] }) {
                       key={value}
                       type="button"
                       disabled={busy !== null}
-                      aria-pressed={active === value}
                       onClick={() => run(value)}
-                      className={`${
-                        active === value ? primaryButtonClass : buttonClass
-                      } inline-flex h-12! items-center justify-center gap-2 text-sm`}
+                      className={`${sceneButtonClass} ${sceneLook[value]}`}
                     >
                       <Icon
                         name={value === "off" ? "power" : "lights"}
