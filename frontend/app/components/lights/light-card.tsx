@@ -53,9 +53,13 @@ function CardFrame({
   const bodyId = useId();
   const label = (
     <span className="min-w-0 flex-1">
-      <span className="block truncate text-sm font-semibold text-ui-fg">{title}</span>
+      <span className="block truncate text-sm font-semibold text-ui-fg">
+        {title}
+      </span>
       {detail && (
-        <span className={`block truncate text-xs text-ui-fg-muted tabular-nums ${mono ? "font-mono" : ""}`}>
+        <span
+          className={`block truncate text-xs text-ui-fg-muted tabular-nums ${mono ? "font-mono" : ""}`}
+        >
           {detail}
         </span>
       )}
@@ -101,7 +105,9 @@ function CardFrame({
           }`}
         >
           <div className="min-h-0 overflow-hidden">
-            <div className="flex flex-col gap-5 border-t border-ui-border-soft p-4">{children}</div>
+            <div className="flex flex-col gap-5 border-t border-ui-border-soft p-4">
+              {children}
+            </div>
           </div>
         </div>
       )}
@@ -141,11 +147,17 @@ function collectPresets(entries: (LightEntry & { state: LightState })[]) {
     .map((preset, index) => ({
       ...preset,
       id: index + 1,
-      name: preset.count === entries.length ? preset.name : `${preset.name} · ${preset.count} of ${entries.length}`,
+      name:
+        preset.count === entries.length
+          ? preset.name
+          : `${preset.name} · ${preset.count} of ${entries.length}`,
     }));
 }
 
-function activeGroupPreset(entries: (LightEntry & { state: LightState })[], collected: Collected[]) {
+function activeGroupPreset(
+  entries: (LightEntry & { state: LightState })[],
+  collected: Collected[],
+) {
   const keys = entries.map((entry) => {
     const preset = entry.presets.find((item) => item.id === entry.state.preset);
     return preset ? presetKey(preset) : null;
@@ -155,12 +167,21 @@ function activeGroupPreset(entries: (LightEntry & { state: LightState })[], coll
   return collected.find((preset) => preset.key === first)?.id ?? -1;
 }
 
-function stateSummary(state: LightState, effects: { id: number; name: string }[], presets: LightPreset[]) {
+function stateSummary(
+  state: LightState,
+  effects: { id: number; name: string }[],
+  presets: LightPreset[],
+) {
   if (!state.on) return "Off";
   const preset = presets.find((item) => item.id === state.preset);
   if (preset) return `On · ${state.brightness} % · ${presetName(preset)}`;
-  const effect = state.effect !== solidEffect ? effects.find((option) => option.id === state.effect)?.name : null;
-  return effect ? `On · ${state.brightness} % · ${effect}` : `On · ${state.brightness} %`;
+  const effect =
+    state.effect !== solidEffect
+      ? effects.find((option) => option.id === state.effect)?.name
+      : null;
+  return effect
+    ? `On · ${state.brightness} % · ${effect}`
+    : `On · ${state.brightness} %`;
 }
 
 export function LightCard({
@@ -177,7 +198,9 @@ export function LightCard({
   if (entry.status === "loading" && !state) {
     return (
       <CardFrame
-        orb={<span className="size-9 shrink-0 animate-pulse rounded-full bg-ui-field" />}
+        orb={
+          <span className="size-9 shrink-0 animate-pulse rounded-full bg-ui-field" />
+        }
         title={light.name}
         detail="Connecting…"
       />
@@ -200,6 +223,34 @@ export function LightCard({
           <button type="button" onClick={onRetry} className={buttonClass}>
             Retry
           </button>
+        }
+      />
+    );
+  }
+
+  // a plug is a relay: no brightness, no colour, no effects. Showing those
+  // controls would offer settings the device cannot take.
+  if (state.kind === "shelly") {
+    return (
+      <CardFrame
+        orb={
+          <LightOrb
+            on={state.on}
+            brightness={100}
+            color={state.color}
+            animated={false}
+          />
+        }
+        title={light.name}
+        detail={lightAddress(light.url)}
+        mono
+        status={<Badge>Plug</Badge>}
+        power={
+          <PowerSwitch
+            on={state.on}
+            label={`${light.name} on`}
+            onChange={(on) => onApply({ on })}
+          />
         }
       />
     );
@@ -231,7 +282,13 @@ export function LightCard({
         palettes={device?.palettes ?? []}
         presets={presetChoices(entry.presets)}
         preset={state.preset}
-        onChange={(change) => onApply(state.on || change.on !== undefined ? change : { ...change, on: true })}
+        onChange={(change) =>
+          onApply(
+            state.on || change.on !== undefined
+              ? change
+              : { ...change, on: true },
+          )
+        }
         onPreset={(preset) => onApply({ preset })}
       />
     </CardFrame>
@@ -251,8 +308,12 @@ export function AllLightsCard({
   );
   const lead = ready[0];
   const withDevice = ready.every((entry) => entry.device !== null);
-  const effects = withDevice ? sharedOptions(ready.map((entry) => entry.device!.effects)) : [];
-  const palettes = withDevice ? sharedOptions(ready.map((entry) => entry.device!.palettes)) : [];
+  const effects = withDevice
+    ? sharedOptions(ready.map((entry) => entry.device!.effects))
+    : [];
+  const palettes = withDevice
+    ? sharedOptions(ready.map((entry) => entry.device!.palettes))
+    : [];
   const onCount = ready.filter((entry) => entry.state.on).length;
   const anyOn = onCount > 0;
   const collected = collectPresets(ready);
@@ -261,14 +322,21 @@ export function AllLightsCard({
     const chosen = collected.find((preset) => preset.id === id);
     if (!chosen) return;
     for (const entry of ready) {
-      const match = entry.presets.find((preset) => presetKey(preset) === chosen.key);
+      const match = entry.presets.find(
+        (preset) => presetKey(preset) === chosen.key,
+      );
       if (match) onApply(entry.light.id, { preset: match.id });
     }
   }
 
   function applyAll(change: LightChange) {
     for (const entry of ready) {
-      const mapped = groupChange(change, { effects, palettes }, entry.device, entry.state.on);
+      const mapped = groupChange(
+        change,
+        { effects, palettes },
+        entry.device,
+        entry.state.on,
+      );
       if (mapped) onApply(entry.light.id, mapped);
     }
   }

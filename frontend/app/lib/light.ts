@@ -7,6 +7,7 @@ export type Light = {
 export type LightState = {
   id: number;
   name: string;
+  kind: Kind;
   on: boolean;
   brightness: number;
   preset: number;

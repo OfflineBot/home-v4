@@ -36,6 +36,7 @@ type Update struct {
 type State struct {
 	ID         int64    `json:"id"`
 	Name       string   `json:"name"`
+	Kind       string   `json:"kind"`
 	On         bool     `json:"on"`
 	Brightness int      `json:"brightness"`
 	Preset     int      `json:"preset"`
@@ -227,8 +228,24 @@ func CurrentState(userID, id int64) (*State, error) {
 		return nil, err
 	}
 
+	kind, err := kindOf(userID, id)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
+
+	// a relay has no brightness, colours or effects to report, so asking it
+	// for a wled state would only ever fail
+	if kind == KindShelly {
+		on, err := shellyClient.Status(ctx, light.URL)
+		if err != nil {
+			return nil, unreachable(err)
+		}
+
+		return plugView(light, on), nil
+	}
 
 	state, err := client.State(ctx, light.URL)
 	if err != nil {
@@ -242,6 +259,14 @@ func SetState(userID, id int64, change Change) (*State, error) {
 	light, err := byID(userID, id)
 	if err != nil {
 		return nil, err
+	}
+
+	kind, err := kindOf(userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if kind == KindShelly {
+		return setPlug(light, change)
 	}
 
 	body, err := statePayload(change)
@@ -267,6 +292,14 @@ func Presets(userID, id int64) ([]Preset, error) {
 	light, err := byID(userID, id)
 	if err != nil {
 		return nil, err
+	}
+
+	kind, err := kindOf(userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if kind == KindShelly {
+		return []Preset{}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
@@ -370,6 +403,20 @@ func DeviceInfo(userID, id int64) (*Device, error) {
 	light, err := byID(userID, id)
 	if err != nil {
 		return nil, err
+	}
+
+	kind, err := kindOf(userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if kind == KindShelly {
+		return &Device{
+			ID:       light.ID,
+			Name:     light.Name,
+			Device:   "Shelly",
+			Effects:  []Option{},
+			Palettes: []Option{},
+		}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
@@ -563,10 +610,56 @@ func presetSlot(existing []wled.Preset, requested *int, overwrite bool) (int, er
 	return 0, ErrPresetsFull
 }
 
+// setPlug accepts the only change a relay understands; everything else would
+// silently do nothing, which is worse than saying so.
+func setPlug(light *Light, change Change) (*State, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+
+	on := false
+	switch {
+	case change.On != nil:
+		on = *change.On
+	case change.Toggle:
+		current, err := shellyClient.Status(ctx, light.URL)
+		if err != nil {
+			return nil, unreachable(err)
+		}
+		on = !current
+	default:
+		return nil, ErrInvalidChange
+	}
+
+	if err := shellyClient.Set(ctx, light.URL, on); err != nil {
+		return nil, unreachable(err)
+	}
+
+	return plugView(light, on), nil
+}
+
+func plugView(light *Light, on bool) *State {
+	brightness := 0
+	if on {
+		brightness = 100
+	}
+
+	return &State{
+		ID:         light.ID,
+		Name:       light.Name,
+		Kind:       KindShelly,
+		On:         on,
+		Brightness: brightness,
+		Preset:     -1,
+		Playlist:   -1,
+		Colors:     []string{},
+	}
+}
+
 func view(light *Light, state *wled.State) *State {
 	out := &State{
 		ID:         light.ID,
 		Name:       light.Name,
+		Kind:       KindWLED,
 		On:         state.On,
 		Brightness: toPercent(state.Brightness),
 		Preset:     state.Preset,
