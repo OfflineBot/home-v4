@@ -25,7 +25,9 @@ func LightRouter(r fiber.Router) {
 		Get("/profiles", lightProfiles).
 		Post("/profile", setLightProfile).
 		Get("/scene", currentLightScene).
-		Post("/scene", applyLightScene)
+		Post("/scene", applyLightScene).
+		Post("/sleep", startLightSleep).
+		Post("/sleep/cancel", cancelLightSleep)
 }
 
 type lightTarget struct {
@@ -58,6 +60,8 @@ func lightError(c fiber.Ctx, status int, code string) error {
 
 func lightResult(c fiber.Ctx, err error) error {
 	switch {
+	case errors.Is(err, lights.ErrInvalidSleep):
+		return lightError(c, fiber.StatusBadRequest, "invalid_sleep")
 	case errors.Is(err, lights.ErrUnknownScene):
 		return lightError(c, fiber.StatusBadRequest, "unknown_scene")
 	case errors.Is(err, lights.ErrUnknownKind):
@@ -266,6 +270,32 @@ func currentLightScene(c fiber.Ctx) error {
 	}
 
 	return c.JSON(status)
+}
+
+func startLightSleep(c fiber.Ctx) error {
+	var body struct {
+		Minutes int  `json:"minutes"`
+		Fade    bool `json:"fade"`
+	}
+	if err := c.Bind().JSON(&body); err != nil {
+		return lightError(c, fiber.StatusBadRequest, "invalid_body")
+	}
+
+	result, err := lights.StartSleep(lightUser(c), body.Minutes, body.Fade)
+	if err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.JSON(result)
+}
+
+func cancelLightSleep(c fiber.Ctx) error {
+	result, err := lights.CancelSleep(lightUser(c))
+	if err != nil {
+		return lightResult(c, err)
+	}
+
+	return c.JSON(result)
 }
 
 func applyLightScene(c fiber.Ctx) error {

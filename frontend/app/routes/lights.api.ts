@@ -79,7 +79,30 @@ export async function action({ request }: Route.ActionArgs) {
     id?: unknown;
     change?: unknown;
     scene?: unknown;
+    sleep?: { minutes?: unknown; fade?: unknown };
   } | null;
+
+  // a null duration cancels; the timer itself runs on the devices
+  if (body?.sleep) {
+    const minutes = body.sleep.minutes;
+    const cancel = minutes === null;
+
+    if (!cancel && !Number.isInteger(minutes)) {
+      return Response.json({ error: "invalid_sleep" }, { status: 400 });
+    }
+
+    return relay(
+      await api(`${base}/sleep${cancel ? "/cancel" : ""}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ minutes, fade: body.sleep.fade === true }),
+        signal: AbortSignal.timeout(sceneTimeoutMs),
+      }),
+    );
+  }
 
   // a scene drives every light at once, so it carries no id
   if (typeof body?.scene === "string") {

@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/lights";
 import { Block, Stack } from "../components/block";
 import { Icon } from "../components/icons";
 import { AllLightsCard, LightCard } from "../components/lights/light-card";
+import { SleepTimer } from "../components/lights/sleep-timer";
 import { useLights } from "../components/lights/use-lights";
 import { Page } from "../components/page";
 import { buttonClass, primaryButtonClass } from "../components/setting-row";
 import { Toast } from "../components/toast";
-import type { Light } from "../lib/light";
+import { lightsApi, type Light } from "../lib/light";
 import { listLights } from "../lib/light.server";
 import { navColor } from "../lib/nav";
 import { requireToken } from "../lib/session";
@@ -24,15 +25,27 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 function LightsBoard({ lights }: { lights: Light[] }) {
   const [failure, setFailure] = useState({ message: "", attempt: 0 });
+  const [sleepIn, setSleepIn] = useState(0);
   const { entries, apply, load } = useLights(lights, (message) =>
     setFailure((current) => ({ message, attempt: current.attempt + 1 })),
   );
   const list = lights.map((light) => entries[light.id]).filter(Boolean);
-  const reachable = list.filter((entry) => entry.status === "ready" && entry.state);
+  const reachable = list.filter(
+    (entry) => entry.status === "ready" && entry.state,
+  );
 
   function switchAll(on: boolean) {
     for (const entry of reachable) apply(entry.light.id, { on });
   }
+
+  const readSleep = useCallback(async () => {
+    const status = await lightsApi.sceneStatus();
+    setSleepIn(status?.sleep_in ?? 0);
+  }, []);
+
+  useEffect(() => {
+    void readSleep();
+  }, [readSleep]);
 
   return (
     <Page
@@ -63,6 +76,16 @@ function LightsBoard({ lights }: { lights: Light[] }) {
       }
     >
       <Stack>
+        <SleepTimer
+          armedFor={sleepIn}
+          onFailure={(message) =>
+            setFailure((current) => ({
+              message,
+              attempt: current.attempt + 1,
+            }))
+          }
+          onChanged={readSleep}
+        />
         {list.length > 1 && <AllLightsCard entries={list} onApply={apply} />}
         {list.map((entry) => (
           <LightCard
@@ -73,7 +96,10 @@ function LightsBoard({ lights }: { lights: Light[] }) {
           />
         ))}
       </Stack>
-      <Toast key={failure.attempt} message={failure.attempt > 0 ? failure.message : null} />
+      <Toast
+        key={failure.attempt}
+        message={failure.attempt > 0 ? failure.message : null}
+      />
     </Page>
   );
 }
@@ -88,7 +114,10 @@ export default function Lights({ loaderData }: Route.ComponentProps) {
           <Block>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-ui-fg-muted">No light yet.</p>
-              <Link to="/settings/connections" className={`${buttonClass} inline-flex items-center`}>
+              <Link
+                to="/settings/connections"
+                className={`${buttonClass} inline-flex items-center`}
+              >
                 Open connections
               </Link>
             </div>
@@ -98,5 +127,10 @@ export default function Lights({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  return <LightsBoard key={lights.map((light) => light.id).join(",")} lights={lights} />;
+  return (
+    <LightsBoard
+      key={lights.map((light) => light.id).join(",")}
+      lights={lights}
+    />
+  );
 }

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"home-v4/backend/services/db"
 	store "home-v4/backend/store/domain_page"
@@ -187,6 +188,13 @@ type Status struct {
 	Scene string  `json:"scene"`
 	On    []int64 `json:"on"`
 	Off   []int64 `json:"off"`
+	// seconds until the lights switch themselves off, 0 when nothing is armed
+	SleepIn int `json:"sleep_in"`
+}
+
+type reading struct {
+	on    bool
+	sleep int
 }
 
 // the broad scenes are checked first: with only wled devices "all" and "led"
@@ -208,14 +216,17 @@ func Current(userID int64) (*Status, error) {
 
 	status := &Status{On: []int64{}, Off: []int64{}}
 	for _, light := range list {
-		on, known := actual[light.ID]
+		found, known := actual[light.ID]
 		if !known {
 			continue
 		}
-		if on {
+		if found.on {
 			status.On = append(status.On, light.ID)
 		} else {
 			status.Off = append(status.Off, light.ID)
+		}
+		if found.sleep > status.SleepIn {
+			status.SleepIn = found.sleep
 		}
 	}
 
@@ -228,8 +239,8 @@ func Current(userID int64) (*Status, error) {
 
 // an unreachable light is left out of the map, so a scene is only reported
 // when every light could be asked
-func readStates(list []Light, stored map[int64]store.LightProfile) map[int64]bool {
-	states := map[int64]bool{}
+func readStates(list []Light, stored map[int64]store.LightProfile) map[int64]reading {
+	states := map[int64]reading{}
 
 	var mutex sync.Mutex
 	var group sync.WaitGroup
@@ -239,14 +250,14 @@ func readStates(list []Light, stored map[int64]store.LightProfile) map[int64]boo
 		go func(light Light, kind string) {
 			defer group.Done()
 
-			on, err := lightOn(light, kind)
+			found, err := readLight(light, kind)
 			if err != nil {
 				return
 			}
 
 			mutex.Lock()
 			defer mutex.Unlock()
-			states[light.ID] = on
+			states[light.ID] = found
 		}(light, profileOf(light.ID, stored).Kind)
 	}
 
@@ -255,27 +266,33 @@ func readStates(list []Light, stored map[int64]store.LightProfile) map[int64]boo
 	return states
 }
 
-func lightOn(light Light, kind string) (bool, error) {
+func readLight(light Light, kind string) (reading, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
 
 	if kind == KindShelly {
-		return shellyClient.Status(ctx, light.URL)
+		on, err := shellyClient.Status(ctx, light.URL)
+		return reading{on: on}, err
 	}
 
 	state, err := client.State(ctx, light.URL)
 	if err != nil {
-		return false, err
+		return reading{}, err
 	}
 
-	return state.On, nil
+	found := reading{on: state.On}
+	if state.Nightlight.On && state.Nightlight.Remaining > 0 {
+		found.sleep = state.Nightlight.Remaining
+	}
+
+	return found, nil
 }
 
-func matchScene(list []Light, stored map[int64]store.LightProfile, actual map[int64]bool) string {
+func matchScene(list []Light, stored map[int64]store.LightProfile, actual map[int64]reading) string {
 	for _, scene := range sceneOrder {
 		fits := true
 		for _, light := range list {
-			if wants(profileOf(light.ID, stored), scene) != actual[light.ID] {
+			if wants(profileOf(light.ID, stored), scene) != actual[light.ID].on {
 				fits = false
 				break
 			}
@@ -286,4 +303,141 @@ func matchScene(list []Light, stored map[int64]store.LightProfile, actual map[in
 	}
 
 	return ""
+}
+
+const (
+	minSleepMinutes = 1
+	maxSleepMinutes = 255 // wled stores the nightlight duration in one byte
+
+	nightlightInstant = 0
+	nightlightFade    = 1
+)
+
+var ErrInvalidSleep = errors.New("invalid sleep duration")
+
+// Sleep asks every light that is on to switch itself off after the delay. The
+// countdown deliberately runs on the devices — wled has a nightlight, shelly a
+// toggle timer — so a restart or a deploy here cannot leave the room lit.
+type Sleep struct {
+	Minutes int     `json:"minutes"`
+	Fade    bool    `json:"fade"`
+	Armed   int     `json:"armed"`
+	Failed  []int64 `json:"failed"`
+}
+
+func StartSleep(userID int64, minutes int, fade bool) (*Sleep, error) {
+	if minutes < minSleepMinutes || minutes > maxSleepMinutes {
+		return nil, ErrInvalidSleep
+	}
+
+	list, err := List(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stored, err := store.LightProfilesByOwner(db.DB, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	actual := readStates(list, stored)
+	result := &Sleep{Minutes: minutes, Fade: fade, Failed: []int64{}}
+
+	var mutex sync.Mutex
+	var group sync.WaitGroup
+
+	for _, light := range list {
+		if found, known := actual[light.ID]; !known || !found.on {
+			continue
+		}
+
+		group.Add(1)
+		go func(light Light, kind string) {
+			defer group.Done()
+
+			err := armSleep(light, kind, minutes, fade)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			if err != nil {
+				result.Failed = append(result.Failed, light.ID)
+				return
+			}
+			result.Armed++
+		}(light, profileOf(light.ID, stored).Kind)
+	}
+
+	group.Wait()
+	slices.Sort(result.Failed)
+
+	return result, nil
+}
+
+func CancelSleep(userID int64) (*Sleep, error) {
+	list, err := List(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stored, err := store.LightProfilesByOwner(db.DB, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &Sleep{Failed: []int64{}}
+
+	var mutex sync.Mutex
+	var group sync.WaitGroup
+
+	for _, light := range list {
+		group.Add(1)
+		go func(light Light, kind string) {
+			defer group.Done()
+
+			err := clearSleep(light, kind)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			if err != nil {
+				result.Failed = append(result.Failed, light.ID)
+				return
+			}
+			result.Armed++
+		}(light, profileOf(light.ID, stored).Kind)
+	}
+
+	group.Wait()
+	slices.Sort(result.Failed)
+
+	return result, nil
+}
+
+func armSleep(light Light, kind string, minutes int, fade bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+
+	if kind == KindShelly {
+		// a relay has nothing to dim, so it simply drops out at the end
+		return shellyClient.OffAfter(ctx, light.URL, time.Duration(minutes)*time.Minute)
+	}
+
+	mode := nightlightInstant
+	if fade {
+		mode = nightlightFade
+	}
+
+	return client.Send(ctx, light.URL, map[string]any{
+		"nl": map[string]any{"on": true, "dur": minutes, "mode": mode, "tbri": 0},
+	})
+}
+
+func clearSleep(light Light, kind string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+
+	if kind == KindShelly {
+		return shellyClient.Set(ctx, light.URL, true)
+	}
+
+	return client.Send(ctx, light.URL, map[string]any{"nl": map[string]any{"on": false}})
 }

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -73,6 +74,25 @@ func (c *Client) Set(ctx context.Context, base string, on bool) error {
 	}
 
 	return c.call(ctx, base, gen1Set, url.Values{"turn": {turn}}, nil)
+}
+
+// OffAfter leaves the relay on and lets the device switch itself off after
+// the delay. The countdown runs on the plug, so it still fires if this server
+// restarts in the meantime.
+func (c *Client) OffAfter(ctx context.Context, base string, after time.Duration) error {
+	seconds := strconv.Itoa(int(after.Round(time.Second).Seconds()))
+
+	query := url.Values{"id": {"0"}, "on": {boolText(true)}, "toggle_after": {seconds}}
+
+	err := c.call(ctx, base, gen2Set, query, nil)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, errNotFound) {
+		return err
+	}
+
+	return c.call(ctx, base, gen1Set, url.Values{"turn": {"on"}, "timer": {seconds}}, nil)
 }
 
 func (c *Client) Status(ctx context.Context, base string) (bool, error) {

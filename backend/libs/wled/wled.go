@@ -65,12 +65,23 @@ type Segment struct {
 type Segments []Segment
 
 type State struct {
-	On          bool     `json:"on"`
-	Brightness  int      `json:"bri"`
-	Preset      int      `json:"ps"`
-	Playlist    int      `json:"pl"`
-	MainSegment int      `json:"mainseg"`
-	Segments    Segments `json:"seg"`
+	On          bool       `json:"on"`
+	Brightness  int        `json:"bri"`
+	Preset      int        `json:"ps"`
+	Playlist    int        `json:"pl"`
+	MainSegment int        `json:"mainseg"`
+	Segments    Segments   `json:"seg"`
+	Nightlight  Nightlight `json:"nl"`
+}
+
+// Nightlight is wled's own sleep timer. Remaining counts down on the device,
+// so the fade keeps running even when nothing is talking to it.
+type Nightlight struct {
+	On        bool `json:"on"`
+	Duration  int  `json:"dur"`
+	Mode      int  `json:"mode"`
+	Target    int  `json:"tbri"`
+	Remaining int  `json:"rem"`
 }
 
 type Preset struct {

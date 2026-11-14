@@ -86,6 +86,7 @@ const errorMessages: Record<string, string> = {
   invalid_body: "Check the light details.",
   invalid_id: "Unknown light.",
   invalid_change: "This change is not possible.",
+  invalid_sleep: "Pick between 1 and 255 minutes.",
   duplicate: "This name or address is already used.",
   not_wled: "No WLED device answers at this address.",
   not_shelly: "No Shelly device answers at this address.",
@@ -247,7 +248,20 @@ export const scenes: { value: Scene; label: string }[] = [
 ];
 
 export type SceneResult = { scene: Scene; changed: number; failed: number[] };
-export type SceneStatus = { scene: Scene | ""; on: number[]; off: number[] };
+export type SceneStatus = {
+  scene: Scene | "";
+  on: number[];
+  off: number[];
+  sleep_in: number;
+};
+export type SleepResult = {
+  minutes: number;
+  fade: boolean;
+  armed: number;
+  failed: number[];
+};
+
+export const sleepPresets = [15, 30, 45, 60, 90, 120];
 
 export const lightsApi = {
   state: (id: number) => get<LightState>("state", id),
@@ -277,6 +291,20 @@ export const lightsApi = {
     } catch {
       return null;
     }
+  },
+
+  async sleep(minutes: number | null, fade = false) {
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sleep: { minutes, fade } }),
+      });
+    } catch {
+      throw new LightRequestError("unreachable_backend", 0);
+    }
+    return read<SleepResult>(res);
   },
 
   async scene(scene: Scene) {
