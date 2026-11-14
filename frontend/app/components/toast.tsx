@@ -19,10 +19,12 @@ export function Toast({ message }: ToastProps) {
   if (!message) return null;
 
   return (
+    // the whole card takes the dismiss, so it goes away wherever it is hit
     <div
       role="alert"
       aria-live="assertive"
-      className={`fixed top-3 right-3 z-50 flex w-72 items-start gap-3 rounded-lg border border-ui-border bg-ui-raised p-3 transition-[opacity,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
+      onClick={() => setVisible(false)}
+      className={`fixed top-3 right-3 z-50 flex w-72 cursor-pointer items-start gap-3 rounded-lg border border-ui-border bg-ui-raised p-3 transition-[opacity,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
         visible
           ? "visible translate-y-0 opacity-100"
           : "pointer-events-none invisible -translate-y-2 opacity-0"
