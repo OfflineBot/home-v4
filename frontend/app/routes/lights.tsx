@@ -9,7 +9,7 @@ import { useLights } from "../components/lights/use-lights";
 import { Page } from "../components/page";
 import { buttonClass, primaryButtonClass } from "../components/setting-row";
 import { Toast } from "../components/toast";
-import { lightsApi, type Light } from "../lib/light";
+import { lightsApi, type Light, type SleepTimerEntry } from "../lib/light";
 import { listLights } from "../lib/light.server";
 import { navColor } from "../lib/nav";
 import { requireToken } from "../lib/session";
@@ -25,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 function LightsBoard({ lights }: { lights: Light[] }) {
   const [failure, setFailure] = useState({ message: "", attempt: 0 });
-  const [sleepIn, setSleepIn] = useState(0);
+  const [timers, setTimers] = useState<SleepTimerEntry[]>([]);
   const { entries, apply, load } = useLights(lights, (message) =>
     setFailure((current) => ({ message, attempt: current.attempt + 1 })),
   );
@@ -40,7 +40,7 @@ function LightsBoard({ lights }: { lights: Light[] }) {
 
   const readSleep = useCallback(async () => {
     const status = await lightsApi.sceneStatus();
-    setSleepIn(status?.sleep_in ?? 0);
+    setTimers(status?.timers ?? []);
   }, []);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ function LightsBoard({ lights }: { lights: Light[] }) {
     >
       <Stack>
         <SleepTimer
-          armedFor={sleepIn}
+          timers={timers}
           onFailure={(message) =>
             setFailure((current) => ({
               message,

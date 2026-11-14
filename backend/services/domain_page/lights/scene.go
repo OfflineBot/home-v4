@@ -190,6 +190,14 @@ type Status struct {
 	Off   []int64 `json:"off"`
 	// seconds until the lights switch themselves off, 0 when nothing is armed
 	SleepIn int `json:"sleep_in"`
+	// one entry per light that is running a countdown right now
+	Timers []Timer `json:"timers"`
+}
+
+type Timer struct {
+	LightID int64  `json:"light_id"`
+	Name    string `json:"name"`
+	SleepIn int    `json:"sleep_in"`
 }
 
 type reading struct {
@@ -214,7 +222,7 @@ func Current(userID int64) (*Status, error) {
 
 	actual := readStates(list, stored)
 
-	status := &Status{On: []int64{}, Off: []int64{}}
+	status := &Status{On: []int64{}, Off: []int64{}, Timers: []Timer{}}
 	for _, light := range list {
 		found, known := actual[light.ID]
 		if !known {
@@ -225,9 +233,17 @@ func Current(userID int64) (*Status, error) {
 		} else {
 			status.Off = append(status.Off, light.ID)
 		}
+		if found.sleep <= 0 {
+			continue
+		}
 		if found.sleep > status.SleepIn {
 			status.SleepIn = found.sleep
 		}
+		status.Timers = append(status.Timers, Timer{
+			LightID: light.ID,
+			Name:    light.Name,
+			SleepIn: found.sleep,
+		})
 	}
 
 	if len(actual) == len(list) && len(list) > 0 {
@@ -271,8 +287,12 @@ func readLight(light Light, kind string) (reading, error) {
 	defer cancel()
 
 	if kind == KindShelly {
-		on, err := shellyClient.Status(ctx, light.URL)
-		return reading{on: on}, err
+		state, err := shellyClient.State(ctx, light.URL)
+		if err != nil {
+			return reading{}, err
+		}
+
+		return reading{on: state.On, sleep: int(state.Remaining.Seconds())}, nil
 	}
 
 	state, err := client.State(ctx, light.URL)
@@ -373,10 +393,19 @@ func StartSleep(userID int64, minutes int, fade bool) (*Sleep, error) {
 	return result, nil
 }
 
-func CancelSleep(userID int64) (*Sleep, error) {
+// CancelSleep clears the countdown on every light, or on one when an id is
+// given: starting a timer by accident must be undoable without going dark.
+func CancelSleep(userID int64, only int64) (*Sleep, error) {
 	list, err := List(userID)
 	if err != nil {
 		return nil, err
+	}
+	if only > 0 {
+		light, err := byID(userID, only)
+		if err != nil {
+			return nil, err
+		}
+		list = []Light{*light}
 	}
 
 	stored, err := store.LightProfilesByOwner(db.DB, userID)

@@ -79,7 +79,7 @@ export async function action({ request }: Route.ActionArgs) {
     id?: unknown;
     change?: unknown;
     scene?: unknown;
-    sleep?: { minutes?: unknown; fade?: unknown };
+    sleep?: { minutes?: unknown; fade?: unknown; id?: unknown };
   } | null;
 
   // a null duration cancels; the timer itself runs on the devices
@@ -98,7 +98,11 @@ export async function action({ request }: Route.ActionArgs) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ minutes, fade: body.sleep.fade === true }),
+        body: JSON.stringify({
+          minutes,
+          fade: body.sleep.fade === true,
+          id: lightId(body.sleep.id) ?? 0,
+        }),
         signal: AbortSignal.timeout(sceneTimeoutMs),
       }),
     );

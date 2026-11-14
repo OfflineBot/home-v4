@@ -96,33 +96,70 @@ func (c *Client) OffAfter(ctx context.Context, base string, after time.Duration)
 }
 
 func (c *Client) Status(ctx context.Context, base string) (bool, error) {
+	state, err := c.State(ctx, base)
+	return state.On, err
+}
+
+// State is the relay plus whatever countdown it is running, so a timer armed
+// on the device can be shown and taken back.
+type State struct {
+	On        bool
+	Remaining time.Duration
+}
+
+func (c *Client) State(ctx context.Context, base string) (State, error) {
 	var gen2 struct {
-		Output *bool `json:"output"`
+		Output        *bool    `json:"output"`
+		TimerDuration *float64 `json:"timer_duration"`
+		TimerStarted  *float64 `json:"timer_started_at"`
 	}
 	err := c.call(ctx, base, gen2Status, url.Values{"id": {"0"}}, &gen2)
 	if err == nil {
 		if gen2.Output == nil {
-			return false, ErrUnexpected
+			return State{}, ErrUnexpected
 		}
-		return *gen2.Output, nil
+
+		return State{On: *gen2.Output, Remaining: remaining(gen2.TimerStarted, gen2.TimerDuration)}, nil
 	}
 	if !errors.Is(err, errNotFound) {
-		return false, err
+		return State{}, err
 	}
 
 	var gen1 struct {
 		Relays []struct {
-			IsOn bool `json:"ison"`
+			IsOn           bool `json:"ison"`
+			TimerRemaining *int `json:"timer_remaining"`
 		} `json:"relays"`
 	}
 	if err := c.call(ctx, base, gen1Status, nil, &gen1); err != nil {
-		return false, err
+		return State{}, err
 	}
 	if len(gen1.Relays) == 0 {
-		return false, ErrUnexpected
+		return State{}, ErrUnexpected
 	}
 
-	return gen1.Relays[0].IsOn, nil
+	state := State{On: gen1.Relays[0].IsOn}
+	if left := gen1.Relays[0].TimerRemaining; left != nil && *left > 0 {
+		state.Remaining = time.Duration(*left) * time.Second
+	}
+
+	return state, nil
+}
+
+// the device reports when the countdown started and how long it runs; what is
+// left has to be worked out against its clock, which is unix time
+func remaining(startedAt, duration *float64) time.Duration {
+	if startedAt == nil || duration == nil || *duration <= 0 {
+		return 0
+	}
+
+	ends := time.Unix(int64(*startedAt), 0).Add(time.Duration(*duration * float64(time.Second)))
+	left := time.Until(ends)
+	if left < 0 {
+		return 0
+	}
+
+	return left
 }
 
 var errNotFound = errors.New("path not found")

@@ -249,11 +249,17 @@ export const scenes: { value: Scene; label: string }[] = [
 ];
 
 export type SceneResult = { scene: Scene; changed: number; failed: number[] };
+export type SleepTimerEntry = {
+  light_id: number;
+  name: string;
+  sleep_in: number;
+};
 export type SceneStatus = {
   scene: Scene | "";
   on: number[];
   off: number[];
   sleep_in: number;
+  timers: SleepTimerEntry[] | null;
 };
 export type SleepResult = {
   minutes: number;
@@ -262,7 +268,8 @@ export type SleepResult = {
   failed: number[];
 };
 
-export const sleepPresets = [15, 30, 45, 60, 90, 120];
+export const minSleepMinutes = 1;
+export const maxSleepMinutes = 255;
 
 export const lightsApi = {
   state: (id: number) => get<LightState>("state", id),
@@ -294,13 +301,13 @@ export const lightsApi = {
     }
   },
 
-  async sleep(minutes: number | null, fade = false) {
+  async sleep(minutes: number | null, fade = false, id?: number) {
     let res: Response;
     try {
       res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sleep: { minutes, fade } }),
+        body: JSON.stringify({ sleep: { minutes, fade, id } }),
       });
     } catch {
       throw new LightRequestError("unreachable_backend", 0);
