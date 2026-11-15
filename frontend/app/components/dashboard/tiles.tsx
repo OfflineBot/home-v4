@@ -153,10 +153,10 @@ const sceneGroups: Scene[][] = [
 ];
 
 // Each scene carries its own colour, so the row is read by looking rather
-// than by reading: light in colour, the theme's black for off, the plugs in
+// than by reading: white for light, the theme's black for off, the plugs in
 // yellow and the strips in neon.
 const sceneLook: Record<Scene, string> = {
-  all: "bg-linear-to-br from-ctp-peach via-ctp-yellow to-ctp-green text-ui-on-accent",
+  all: "bg-ctp-text text-ui-on-accent",
   off: "bg-ctp-crust text-ui-fg border border-ui-border-soft",
   led: "bg-linear-to-br from-ctp-mauve to-ctp-teal text-ui-on-accent",
   no_led: "bg-ctp-yellow text-ui-on-accent",
