@@ -54,6 +54,8 @@ function dayHref(day: string) {
   return `/calendar${calendarHref("week", date ?? undefined)}`;
 }
 
+const focusListMax = 3;
+
 const pressable =
   "rounded-xl outline-none transition-colors hover:bg-ui-hover focus-visible:ring-2 focus-visible:ring-ui-ring motion-reduce:transition-none";
 
@@ -84,6 +86,7 @@ export function ClockCard({ now, plan, calendarFailed, mail, notices, lights }: 
         <Link to={dayHref(focus.day)} className={`-mx-3 -my-2 flex flex-col gap-2 px-3 py-2 ${pressable}`}>
           {focusLabel && <span className="text-sm font-medium text-[var(--accent-fg)]">{focusLabel}</span>}
           <DayTimeline items={focus.items} now={now} day={focus.day} showNow={focus.isToday} />
+          {!focus.isToday && <FocusList items={focus.items} />}
         </Link>
       )}
 
@@ -123,6 +126,47 @@ function Glance({ plan, now, focusLabel, href }: { plan: DayPlan; now: number; f
         {item.room && <span className="ml-auto truncate text-xs text-ui-fg-muted">{item.room}</span>}
       </span>
     </EventBox>
+  );
+}
+
+/// A bar says when, not what: for a day that has not started the events are
+/// named as well, and the row underneath says how many did not fit.
+function FocusList({ items }: { items: AgendaItem[] }) {
+  const shown = items.slice(0, focusListMax);
+  const rest = items.length - shown.length;
+
+  return (
+    <span className="mt-1 flex flex-col gap-1.5">
+      {shown.map((item) => (
+        <span
+          key={item.id}
+          style={eventAccent(item.color, item.online)}
+          className="flex min-w-0 items-center gap-2.5 text-sm"
+        >
+          <span className="h-4 w-1 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden />
+          <span className="shrink-0 text-ui-fg-muted tabular-nums">
+            {clockTime(item.start)}
+          </span>
+          <span
+            className={`min-w-0 flex-1 truncate text-ui-fg ${
+              item.cancelled ? "line-through opacity-60" : ""
+            }`}
+          >
+            {item.title}
+          </span>
+          {item.room && (
+            <span className="shrink-0 truncate text-xs text-ui-fg-faint">
+              {item.room}
+            </span>
+          )}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="pl-3.5 text-xs text-ui-fg-muted">
+          +{rest} more {rest === 1 ? "event" : "events"}
+        </span>
+      )}
+    </span>
   );
 }
 
